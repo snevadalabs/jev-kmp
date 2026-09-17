@@ -1,3 +1,4 @@
+import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.dsl.ExplicitApiMode
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
@@ -9,6 +10,7 @@ plugins {
     alias(libs.plugins.ktlint)
     alias(libs.plugins.dokka)
     alias(libs.plugins.binary.compatibility.validator)
+    alias(libs.plugins.kover)
     alias(libs.plugins.maven.publish)
 }
 
@@ -117,6 +119,10 @@ kotlin {
         // The default engines, so a caller configures nothing. Ktor publishes all four as plain JVM JARs for
         // Android as well as the JVM, which is why androidMain can reuse the OkHttp artifact.
         jvmMain.dependencies { implementation(libs.ktor.client.okhttp) }
+        jvmTest.dependencies {
+            // Tier 2 binds CIO to a loopback socket, and CIO is the engine the ticket names for it.
+            implementation(libs.ktor.client.cio)
+        }
         androidMain.dependencies { implementation(libs.ktor.client.okhttp) }
         appleMain.dependencies { implementation(libs.ktor.client.darwin) }
         linuxMain.dependencies { implementation(libs.ktor.client.cio) }
@@ -225,5 +231,26 @@ val checkJvmBytecode by tasks.registering {
 }
 
 tasks.named("check") {
-    dependsOn(checkVersion, checkJvmBytecode)
+    // The coverage floor is part of the gate, not a report someone remembers to open.
+    dependsOn(checkVersion, checkJvmBytecode, "koverVerify")
+}
+
+// The live tier is opt-in through this property; a default `check` can never reach the network or spend money.
+// The API key is checked inside the tests, so `-Ptypesafe.live=true` with no key fails rather than skips.
+tasks.named<Test>("jvmTest") {
+    systemProperty("typesafe.live", providers.gradleProperty("typesafe.live").getOrElse("false"))
+}
+
+// Coverage over the SDK source, measured by the JVM tests: Kover supports JVM and Android only, so this is the
+// JVM compilation of commonMain + jvmMain (Apple and Linux source sets are not measurable). The code measures
+// 94.6% line coverage; the floor is set at what it actually achieves. It is a gate, not a target — do not lower
+// it to make a build pass.
+kover {
+    reports {
+        verify {
+            rule {
+                minBound(94)
+            }
+        }
+    }
 }

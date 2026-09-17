@@ -1,25 +1,45 @@
 package com.sierranevadalabs.jev.sdk.conformance
 
-import io.ktor.client.HttpClient
+import com.sierranevadalabs.jev.sdk.Answer
+import com.sierranevadalabs.jev.sdk.ChoiceAnswer
+import com.sierranevadalabs.jev.sdk.NoulAnswer
+import com.sierranevadalabs.jev.sdk.Question
+import com.sierranevadalabs.jev.sdk.RetryPolicy
+import com.sierranevadalabs.jev.sdk.ScoreAnswer
+import com.sierranevadalabs.jev.sdk.SystemOneResponse
+import com.sierranevadalabs.jev.sdk.TypeSafeConfig
+import com.sierranevadalabs.jev.sdk.UnknownAnswer
+import com.sierranevadalabs.jev.sdk.choice
+import com.sierranevadalabs.jev.sdk.createClient
+import com.sierranevadalabs.jev.sdk.errors.APIConnectionError
+import com.sierranevadalabs.jev.sdk.errors.APIResponseValidationError
+import com.sierranevadalabs.jev.sdk.errors.APITimeoutError
+import com.sierranevadalabs.jev.sdk.errors.AuthenticationError
+import com.sierranevadalabs.jev.sdk.errors.BadRequestError
+import com.sierranevadalabs.jev.sdk.errors.InternalServerError
+import com.sierranevadalabs.jev.sdk.errors.JevError
+import com.sierranevadalabs.jev.sdk.errors.NotFoundError
+import com.sierranevadalabs.jev.sdk.errors.PermissionDeniedError
+import com.sierranevadalabs.jev.sdk.errors.RateLimitError
+import com.sierranevadalabs.jev.sdk.errors.UnprocessableEntityError
+import com.sierranevadalabs.jev.sdk.noul
+import com.sierranevadalabs.jev.sdk.score
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.engine.mock.toByteArray
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.client.statement.HttpResponse
 import io.ktor.http.Headers
+import io.ktor.http.HeadersBuilder
 import io.ktor.http.HttpStatusCode
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.reflect.KClass
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.assertIs
 import kotlin.test.fail
 
 /** One response in a case's script: the status, the headers, and the exact bytes of the body. */
@@ -80,79 +100,157 @@ private fun parseResponse(element: JsonElement): FixtureResponse {
 }
 
 /**
- * Replays one case through Ktor's `MockEngine` and checks the format's own invariants: the transport sees the
- * fixture's request and response bytes, and the declared expectation is derivable from the declared payload.
+ * Replays one case through the **real client** over Ktor's `MockEngine`, and checks everything the format's
+ * `expect` block declares.
  *
- * The stub stands in for the SDK. *Build the conformance, wire, and live test tiers* replaces it with the real
- * client, which turns the last check into "the SDK's decoded answers match `expect.answers`" without touching
- * the fixtures. ponytail: there is no retry loop here either — the response list *is* the attempt count until
- * the real transport exists.
+ * The response list *is* the attempt script, so a one-response case runs with retries off and makes exactly one
+ * attempt even when its status would otherwise be retryable (the `502` HTML case), while a two-response case
+ * runs the client's own policy and the `429` actually retries. `expect.delayMs` is read from the transport's
+ * `sleeper` seam — the same seam the retry tests use — rather than waited out.
  */
 internal suspend fun assertConformanceCase(case: FixtureCase) {
+    val delays = mutableListOf<Long>()
     var attempt = 0
-    val requests = mutableListOf<String>()
     val engine =
-        MockEngine { request ->
-            requests += request.body.toByteArray().decodeToString()
+        MockEngine { _ ->
             val response = case.responses[attempt++]
             respond(
                 response.body,
                 HttpStatusCode.fromValue(response.status),
-                Headers.build { response.headers.forEach { (name, value) -> append(name, value) } },
+                response.headers.asHeaders(),
             )
         }
-    val client = HttpClient(engine)
+    val client =
+        createClient(
+            TypeSafeConfig(apiKey = "test-key", engine = engine),
+            env = { null },
+            random = { 0.0 },
+            sleeper = { delays += it },
+        )
     try {
-        var response: HttpResponse? = null
-        repeat(case.responses.size) {
-            response = client.post(case.path) { setBody(case.requestBody) }
+        val request = Json.parseToJsonElement(case.requestBody).jsonObject
+        val questions = request.getValue("questions").toQuestions()
+        // The script's length is the attempt count, so a lone response means no retries even for a 5xx status.
+        val retry = if (case.responses.size == 1) RetryPolicy(maxRetries = 0) else null
+
+        var response: SystemOneResponse? = null
+        var failure: Throwable? = null
+        try {
+            response =
+                client.systemOne(
+                    request.getValue("state"),
+                    *questions.toTypedArray(),
+                    model = request["model"]?.jsonPrimitive?.content,
+                    retry = retry,
+                )
+        } catch (thrown: Throwable) {
+            failure = thrown
         }
-        assertEquals(case.responses.size, requests.size, "${case.id}: attempts the transport saw")
-        assertEquals(case.requestBody, requests.first(), "${case.id}: request body")
-        assertEquals(case.requestBody, requests.last(), "${case.id}: retried request body")
-        assertFixtureShape(case, assertNotNull(response).status.value)
+
+        assertWire(case, engine)
+
+        val declaredError = case.expect["error"]?.jsonPrimitive?.content
+        if (declaredError != null) {
+            val error = assertIs<JevError>(failure, "${case.id}: expected $declaredError, got ${failure ?: "success"}")
+            assertEquals(declaredError.toErrorClass(), error::class, "${case.id}: error class")
+            case.expect["message"]?.jsonPrimitive?.content?.let { message ->
+                assertEquals(message, error.message, "${case.id}: extracted message")
+            }
+            case.expect["field"]?.jsonPrimitive?.content?.let { field ->
+                val validation = error as? APIResponseValidationError ?: fail("${case.id}: '$declaredError' carries no field")
+                assertEquals(field, validation.field, "${case.id}: offending field")
+            }
+        } else {
+            assertEquals(null, failure, "${case.id}: expected success")
+            assertAnswers(case, requireNotNull(response).answers)
+            case.expect["usage"]?.jsonPrimitive?.content?.let { expected ->
+                assertEquals(expected == "present", response.usage != null, "${case.id}: usage must be $expected")
+            }
+        }
+
+        case.expect["delayMs"]?.jsonPrimitive?.content?.toLong()?.let { expected ->
+            assertEquals(listOf(expected), delays, "${case.id}: the transport's retry delay")
+        }
     } finally {
         client.close()
     }
 }
 
-private fun assertFixtureShape(
+/** The request the real client put on the wire is the fixture's request — no key added, dropped, or retyped. */
+private suspend fun assertWire(
     case: FixtureCase,
-    status: Int,
+    engine: MockEngine,
 ) {
-    assertEquals(case.responses.last().status, status, "${case.id}: final status")
+    val attempts = engine.requestHistory
+    assertEquals(case.responses.size, attempts.size, "${case.id}: attempts the client made")
+    val first = attempts.first()
+    assertEquals(case.method, first.method.value, "${case.id}: method")
+    assertEquals(case.path, first.url.encodedPath, "${case.id}: path")
+    assertEquals(
+        Json.parseToJsonElement(case.requestBody),
+        Json.parseToJsonElement(first.body.toByteArray().decodeToString()),
+        "${case.id}: request body",
+    )
+}
 
-    case.expect["error"]?.jsonPrimitive?.content?.let { name ->
-        assertTrue(
-            case.expect["message"] != null || case.expect["field"] != null,
-            "${case.id}: '$name' must name the extracted message or the offending field",
-        )
-        return
-    }
-
-    val last = case.responses.last()
-    val lastBody = last.body.decodeToString()
-    val payload = Json.parseToJsonElement(lastBody).jsonObject
-    case.expect["usage"]?.jsonPrimitive?.content?.let { expected ->
-        val usage = payload["usage"]
-        val present = usage != null && usage !is JsonNull
-        assertEquals(expected == "present", present, "${case.id}: usage must be $expected")
-    }
-    case.expect["answers"]?.jsonObject?.forEach { (key, type) ->
-        val answer = payload.getValue("answers").jsonObject[key] ?: fail("${case.id}: no answer '$key'")
-        val answerObject = answer.jsonObject
-        val declaredType = answerObject.getValue("type")
-        val declared = declaredType.jsonPrimitive.content
-        if (type.jsonPrimitive.content == "unknown") {
-            val unknownTypes = case.expect["unknownTypes"]?.jsonObject
-            val expectedType = unknownTypes?.get(key)?.jsonPrimitive?.content
-            assertTrue(declared !in KNOWN_ANSWER_TYPES, "${case.id}: '$key' is a known type, not an unknown one")
-            assertEquals(expectedType, declared, "${case.id}: '$key' carries the server's own type string")
-        } else {
-            assertEquals(type.jsonPrimitive.content, declared, "${case.id}: '$key' answer type")
+/** The answer types a case declares, checked against the decoded answer hierarchy. */
+private fun assertAnswers(
+    case: FixtureCase,
+    answers: Map<String, Answer>,
+) {
+    case.expect["answers"]?.jsonObject?.forEach { (key, declared) ->
+        val answer = answers[key] ?: fail("${case.id}: no answer '$key'")
+        when (val type = declared.jsonPrimitive.content) {
+            in KNOWN_ANSWER_TYPES -> assertEquals(type, answer.declaredTypeName(), "${case.id}: '$key' answer type")
+            "unknown" -> {
+                val unknown = assertIs<UnknownAnswer>(answer, "${case.id}: '$key' must stay unknown")
+                val expected =
+                    case.expect["unknownTypes"]
+                        ?.jsonObject
+                        ?.get(key)
+                        ?.jsonPrimitive
+                        ?.content
+                assertEquals(expected, unknown.type, "${case.id}: '$key' carries the server's own type string")
+            }
+            else -> fail("${case.id}: '$key' declares an unknown expected type '$type'")
         }
     }
-    case.expect["delayMs"]?.let {
-        assertTrue(case.responses.size > 1, "${case.id}: delayMs means a retry, so there must be two responses")
-    }
 }
+
+private fun Answer.declaredTypeName(): String =
+    when (this) {
+        is NoulAnswer -> "noul"
+        is ChoiceAnswer -> "choice"
+        is ScoreAnswer -> "score"
+        is UnknownAnswer -> "unknown"
+    }
+
+/** `expect.error` is the class name every SDK uses, with any SDK prefix removed (ADR 0005). */
+private fun String.toErrorClass(): KClass<out JevError> =
+    when (this) {
+        "BadRequestError" -> BadRequestError::class
+        "AuthenticationError" -> AuthenticationError::class
+        "PermissionDeniedError" -> PermissionDeniedError::class
+        "NotFoundError" -> NotFoundError::class
+        "UnprocessableEntityError" -> UnprocessableEntityError::class
+        "RateLimitError" -> RateLimitError::class
+        "InternalServerError" -> InternalServerError::class
+        "APIConnectionError" -> APIConnectionError::class
+        "APITimeoutError" -> APITimeoutError::class
+        "APIResponseValidationError" -> APIResponseValidationError::class
+        else -> fail("no canonical error class named '$this'")
+    }
+
+private fun JsonElement.toQuestions(): List<Question<*>> =
+    jsonObject.map { (id, element) ->
+        val question = element.jsonObject
+        val prompt = question.getValue("instructions")
+        when (val type = question.getValue("type").jsonPrimitive.content) {
+            "noul" -> noul(id, prompt)
+            "choice" -> choice(id, prompt, question.getValue("criteria").jsonObject)
+            "score" -> score(id, prompt, question.getValue("criteria").jsonArray.map { it })
+            else -> fail("no question builder for fixture type '$type'")
+        }
+    }
+
+private fun Map<String, String>.asHeaders(): Headers = HeadersBuilder().apply { forEach { (name, value) -> append(name, value) } }.build()
