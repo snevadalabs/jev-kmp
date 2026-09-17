@@ -14,6 +14,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.random.Random
 import kotlin.time.Duration
+import kotlin.time.TimeSource
 
 /**
  * The TypeSafe / Jev System One client.
@@ -78,6 +79,8 @@ internal fun createClient(
     engineFactory: () -> HttpClientEngine = ::createDefaultEngine,
     random: () -> Double = { Random.nextDouble() },
     sleeper: suspend (Long) -> Unit = { delay(it) },
+    timeSource: TimeSource = TimeSource.Monotonic,
+    sink: (String) -> Unit = ::println,
 ): TypeSafeClient {
     val resolved = ResolvedConfig(config, env)
     val transport =
@@ -88,10 +91,12 @@ internal fun createClient(
             defaultHeaders = config.defaultHeaders,
             timeout = resolved.timeout,
             retryPolicy = config.retry,
+            log = logSink(resolved.logLevel, sink),
             httpClientConfig = config.httpClientConfig,
             engineFactory = engineFactory,
             random = random,
             sleeper = sleeper,
+            timeSource = timeSource,
         )
     return TypeSafeClientImpl(transport, resolved.defaultModel)
 }

@@ -18,6 +18,8 @@ Initial release.
   question object is itself the statically typed key for reading its answer.
 - Retry with the JS delay policy on Ktor's `HttpRequestRetry`, plus per-call `RetryPolicy`, `model`, and
   `timeout` overrides.
+- Opt-in logging: `LogLevel` and `TypeSafeConfig.logLevel` (or `TYPESAFE_LOG_LEVEL`), off by default, writing one
+  line per call and one per retry and never a header, a body or the API key.
 - Targets: JVM, Android, `iosArm64`, `iosSimulatorArm64`, `iosX64` (compile-only), `macosArm64`, `linuxX64`.
 - A cross-language wire-conformance fixture suite in `conformance/`, and the committed
   binary-compatibility baseline at `api/jvm/jev-kmp.api`.

@@ -22,6 +22,8 @@ import kotlinx.coroutines.delay
 import kotlin.random.Random
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 /**
  * The one place an HTTP call leaves this SDK. Everything above it sees [TransportResponse] or
@@ -36,6 +38,8 @@ internal class Transport(
     private val defaultHeaders: Map<String, String>,
     private val retryPolicy: RetryPolicy,
     private val random: () -> Double,
+    private val log: (String) -> Unit,
+    private val timeSource: TimeSource,
 ) : AutoCloseable {
     /**
      * Sends one request. [body] must be a `String`, because Ktor copies the body object by reference on each
@@ -52,8 +56,9 @@ internal class Transport(
         policy: RetryPolicy? = null,
     ): TransportResponse {
         val effectivePolicy = policy ?: retryPolicy
-        val response =
-            try {
+        val started = timeSource.markNow()
+        try {
+            val response =
                 http.request(joinUrl(baseUrl, path)) {
                     this.method = method
                     assembleHeaders(defaultHeaders, headers, apiKey, hasBody = body != null).forEach { (name, value) ->
@@ -65,14 +70,15 @@ internal class Transport(
                     if (timeout != null) this.timeout { requestTimeoutMillis = timeout.inWholeMilliseconds }
                     retry { applyPolicy(effectivePolicy, random) }
                 }
-            } catch (cause: Throwable) {
-                throw cause.asTransportFailure()
-            }
-
-        return try {
-            response.toTransportResponse(effectivePolicy)
+            val transportResponse = response.toTransportResponse(effectivePolicy)
+            log(responseLine(method, path, transportResponse, started))
+            return transportResponse
         } catch (cause: Throwable) {
-            throw cause.asTransportFailure()
+            val failure = cause.asTransportFailure()
+            // A call that never got a response is exactly when a reader wants a line, so it gets one carrying
+            // the failure's class where a response would carry its status.
+            if (failure is TransportException) log(failureLine(method, path, failure.cause, started))
+            throw failure
         }
     }
 
@@ -125,6 +131,7 @@ internal fun createTransport(
     log: (String) -> Unit = {},
     random: () -> Double = { Random.nextDouble() },
     sleeper: suspend (Long) -> Unit = { delay(it) },
+    timeSource: TimeSource = TimeSource.Monotonic,
     httpClientConfig: HttpClientConfig<*>.() -> Unit = {},
     engineFactory: () -> HttpClientEngine = ::createDefaultEngine,
 ): Transport {
@@ -160,8 +167,36 @@ internal fun createTransport(
         defaultHeaders = defaultHeaders,
         retryPolicy = retryPolicy,
         random = random,
+        log = log,
+        timeSource = timeSource,
     )
 }
+
+/**
+ * The per-call line: method, path, status, duration and request id. Nothing else — never a header, a body, the
+ * query string, or the API key, all of which are unreachable from here by construction.
+ */
+private fun responseLine(
+    method: HttpMethod,
+    path: String,
+    response: TransportResponse,
+    started: TimeMark,
+): String =
+    "$method ${logPath(path)} <- ${response.status} in ${started.elapsedNow().inWholeMilliseconds}ms" +
+        (response.requestId?.let { " (request $it)" } ?: "")
+
+/** The same line for a call that never got a response, carrying the failure's class in place of a status. */
+private fun failureLine(
+    method: HttpMethod,
+    path: String,
+    cause: Throwable?,
+    started: TimeMark,
+): String =
+    "$method ${logPath(path)} <- failed in ${started.elapsedNow().inWholeMilliseconds}ms " +
+        "(${cause?.let { it::class.simpleName } ?: "unknown"})"
+
+/** The path only: a query string never reaches a log line, whatever a caller puts in one. */
+private fun logPath(path: String): String = path.substringBefore('?')
 
 private fun joinUrl(
     baseUrl: String,

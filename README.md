@@ -40,7 +40,8 @@ import com.sierranevadalabs.jev.sdk.noul
 import com.sierranevadalabs.jev.sdk.score
 import com.sierranevadalabs.jev.sdk.systemOne
 
-// Reads TYPESAFE_API_KEY, TYPESAFE_BASE_URL and TYPESAFE_DEFAULT_MODEL; see TypeSafeConfig for precedence.
+// Reads TYPESAFE_API_KEY, TYPESAFE_BASE_URL, TYPESAFE_DEFAULT_MODEL and TYPESAFE_LOG_LEVEL; see TypeSafeConfig
+// for precedence. Pass apiKey = "…", baseUrl = "…" or defaultModel = "…" to override the environment.
 val client = TypeSafeClient(TypeSafeConfig())
 
 // The question carries its own id, so the question object is also the key its answer comes back under.
@@ -60,6 +61,19 @@ client.use {
 Every call is `suspend`, so wrap it in your own coroutine scope; a JVM caller who wants a blocking call writes
 `runBlocking { }`. `TypeSafeClient` is `AutoCloseable` and closes the HTTP engine it created, never one you
 passed in.
+
+### Logging
+
+Logging is **off by default**. Turn it on with `TypeSafeConfig(logLevel = LogLevel.Info)`, or by setting
+`TYPESAFE_LOG_LEVEL` to one of `debug`, `info`, `warn`, `error` or `off` (read case-insensitively; an
+unrecognised value is rejected with an error naming the variable rather than silently turning logging off).
+`info` writes one line per call — method, path, status, duration and request id — and one line per retry; `debug`
+writes the same lines today and is reserved for the byte-level logging of a later logger abstraction; `warn` and
+`error` write nothing, and exist so a `TYPESAFE_LOG_LEVEL` that works against the Python or JavaScript SDK does
+not throw here. A failed call is logged too, at the level that is on, with the status it failed on.
+
+No level writes a header, a body, the query string, or the API key. Every line is built from the method, path,
+status, duration and request id alone, so there is no redaction table that can be incomplete.
 
 ## Differences from the Python and JavaScript SDKs
 
@@ -94,9 +108,10 @@ passed in.
 
 - **A `score` question needs at least two levels.** Fewer is rejected locally with an `IllegalArgumentException`
   instead of spending a `422`; both SDKs require it on the wire.
-- **No log line can carry a header or a body.** 0.1.0 has no logging switch: what a call reports is one line per
-  retry, with the attempt number and the status or cause, and headers and bodies are never formatted at all — so
-  no blacklist of header names can be incomplete.
+- **No log line can carry a header, a body or the API key.** Logging is off by default — a deliberate divergence
+  from the JavaScript SDK, whose default is `warn` — and when it is enabled, `info` reports one line per call
+  (method, path, status, duration, request id) and one line per retry. Nothing else is formatted at all, so no
+  blacklist of header names can be incomplete.
 - **The public API dump is committed.** `api/` is compared on every build, so the surface cannot change without
   a reviewed diff.
 
