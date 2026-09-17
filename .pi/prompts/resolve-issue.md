@@ -34,7 +34,7 @@ No number given → take the first ticket in `.scratch/jev-kmp-sdk/map.md` whose
 - `explicitApi` is `Strict`: every declaration is `public` or `internal`, and everything `public` carries KDoc. Implementation detail is `internal` — the transport, the retry mapping, the fixture loader, the `Retry-After` parser, and every seam injected for testing.
 - Adding public API moves `api/jvm/jev-kmp.api`: run `./gradlew apiDump` and commit the result. Public API nobody asked for is a bug, not a bonus.
 - Versions live in `gradle/libs.versions.toml`. Do not add a dependency the ticket does not name.
-- **The gate is `./gradlew checkVersion ktlintCheck jvmTest apiCheck`, and it must be green before you push.** Run `./gradlew check` when you want the Apple and Linux targets too; when several tickets run in parallel the simulator targets contend, so a simulator-only failure is CI's business — say so instead of chasing it.
+- **The gate is `./gradlew check`, and it must be green before you push.** GitHub Actions is disabled while the org's billing is blocked, so nothing runs on your pull request and there is no CI to fall back on — the full check is the only verification that happens. Several tickets running at once contend for the simulators; if an Apple task fails that way, say which one and why rather than retrying blindly.
 - Leave `.scratch/jev-kmp-sdk/map.md` alone. The parent session owns it, and parallel branches editing one file conflict.
 - **ADR ownership.** `0005` (the `conformance` fixture format) belongs to the fixture-format ticket. Every other number belongs to the foundational-ADR ticket. Write only your own numbers.
 - Mark a deliberate simplification that cuts a real corner with a `ponytail:` comment naming the ceiling and the upgrade path.
@@ -48,7 +48,7 @@ No number given → take the first ticket in `.scratch/jev-kmp-sdk/map.md` whose
 ## 5. Ship
 
 - Commit on the branch your worktree was created with (`issue-<n>-<slug>`).
-- `git push -u origin HEAD`, then `gh pr create --fill --base main`. CI runs on the pull request.
+- `git push -u origin HEAD`, then `gh pr create --fill --base main`. Actions is disabled, so the pull request will show no checks — that is expected, not a failure. The parent session runs the gate locally and merges.
 - Do not merge, do not push to `main`, do not close anything. The parent session merges.
 
 ## 6. Report, then clean up
