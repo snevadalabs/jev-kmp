@@ -116,6 +116,8 @@ No `Entry` wrapper type — `JsonElement` is already the KMP JSON currency. `Any
 
 Kotlin package `com.sierranevadalabs.jev.sdk.errors`, class names **verbatim** as the siblings (`BadRequestError`, `AuthenticationError`, `PermissionDeniedError`, `NotFoundError`, `UnprocessableEntityError`, `RateLimitError`, `InternalServerError`, plus the connection/timeout/validation branch). `TypeSafeClient` is the only `TypeSafe`-prefixed public name. Verbatim names mean an existing `catch` block ports by name.
 
+**[amended by the parent while resolving *Implement the client and error tree*]** The root is **`JevError`**, not JS's `TypeSafeError`: the sentence above cannot hold otherwise, and the parenthetical list is JS's already-de-prefixed set, so the root was the one name nobody had decided. `Jev` is the project's own identifier prefix — the `@InternalJev` marker this brief later drops as unused — and matches openai-kotlin's `<Project>Error` convention. The rest of the 12 stay JS's verbatim. JS's `APIUserAbortError` is **not** ported: a Kotlin caller abort is `CancellationException`, which we never wrap.
+
 **Client-side validation is exactly two things**: a non-empty question map, and score criteria with at least two levels. Everything else is forwarded to the server, matching both siblings.
 
 `RateLimitError` carries `retryAfterMs`, parsed from `retry-after-ms` then `retry-after` (seconds or HTTP-date), rejecting non-finite and negative values. **[amended by *Reconcile retry against Ktor's built-in HttpRequestRetry*]** That parser is one **internal** function shared with the retry delay policy — neither sibling exports its own — and `respectRetryAfter = false` disables both header forms.
