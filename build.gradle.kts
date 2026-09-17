@@ -98,6 +98,9 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            // `JsonElement` is part of the public surface (questions, answers, state), so consumers need it on
+            // their compile classpath rather than only at runtime.
+            api(libs.kotlinx.serialization.json)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.ktor.client.core)
         }
@@ -148,14 +151,6 @@ mavenPublishing {
             developerConnection = "scm:git:ssh://git@github.com/snevadalabs/jev-kmp.git"
         }
     }
-}
-
-// binary-compatibility-validator is applied above to every Kotlin project in this build, including the
-// throwaway `prototype` module. It is not part of the published surface, has no committed dump and will be
-// deleted once tickets 11 and 12 land the real model, so it is skipped explicitly. Removing this block
-// must go together with removing the module, or `apiCheck` fails on a missing dump.
-apiValidation {
-    ignoredProjects += "prototype"
 }
 
 // The version and the changelog are two sources of truth that must not drift. SNAPSHOT versions require an
