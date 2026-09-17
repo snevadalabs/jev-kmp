@@ -1,7 +1,7 @@
 # Implement the logging surface
 
 Type: task
-Status: open
+Status: claimed
 Blocked by: 12
 
 ## Question
