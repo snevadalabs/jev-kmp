@@ -1,7 +1,7 @@
 # Evaluate mutation testing as a way to find what coverage cannot see
 
 Type: research
-Status: claimed
+Status: resolved
 Blocked by:
 
 ## Question
@@ -73,3 +73,66 @@ Actions is disabled — every mutation run is local, and nothing may slow `./gra
 class with their classification, ticket-21 overlap), the committed config if the verdict is to adopt it, and an
 `## Answer` carrying the numbers, the verdict and what a later ticket would have to pick up. Research is a decision
 input, so the Answer must be readable without opening the research file.
+
+## Answer
+
+**Verdict: adopt as an on-demand task, documented, not in `check`.** Shipped in PR
+<https://github.com/snevadalabs/jev-kmp/pull/12> (unmerged; the parent session merges). Full tables and the
+per-mutant classification are in
+[`research/22-mutation-testing-evaluation.md`](../research/22-mutation-testing-evaluation.md); this is readable
+without it.
+
+**Verdict on the tool.** PIT works. `info.solidsoft.pitest` 1.19.0 running `org.pitest:pitest-command-line`
+1.22.1 mutates this SDK's Kotlin bytecode usefully: 749 mutants over 40 classes, **103 s**, 7% mechanical noise
+(the ticket guessed high; `EmptyObjectReturnValsMutator` on `Unit` lambdas, `ResultKt.throwOnFailure` and
+`checkNotNullExpressionValue` are the whole of it). Plain PIT is good enough here — no Arcmutate.
+`NON_VOID_METHOD_CALLS` is in PIT's `ALL` group but **not** in `STRONGER`, which is why the ticket's suggested
+mutator set misses every value-returning call. Adding it: 1417 mutants, 79.6% strength, 22% noise, 2 m 21 s.
+
+**The integration, which is the one thing a later reader needs.** The plugin registers its `pitest` task inside
+`withType(JavaPlugin)`, which a KMP module never applies, so no task ever appears. The committed `pitestJvm`
+task registers the plugin's own `PitestTask` against the JVM test compilation instead. Two traps cost a run
+each: `additionalClasspathFile`'s parent directory is not created by PIT, and `runtimeDependencyFiles` is
+dependencies only, so the main classes directory must be added explicitly.
+
+**Baseline** (`./gradlew pitestJvm` → `build/reports/pitest/mutations.xml`): 749 generated, 527 killed, 7 timed
+out, **182 survived**, 33 with no coverage. **Test strength 534/716 = 74.6%**, against **Kover line coverage of
+95.33%** (24 missed / 490 covered, floor 94) on the same compilation. That gap is the number the ticket wanted:
+at a 95% line floor, a quarter of the covered mutants still live. Repeat runs flip 6 of 749 mutants (0.8%) and
+move the score by one mutant. 44 mutants (6%) report impossible line numbers — Kotlin inline functions defeat
+PIT's source mapping — so read the XML per method, not per line.
+
+**The pay-off check: 0 of the 3 ticket-21 behaviours produced a matching surviving mutant.**
+`Record.parseBody`'s missing content-type check is an *omitted* check — `content-type` is never read, so there
+is no bytecode to mutate. `Headers.assembleHeaders`' `name.lowercase()` and `byLowercaseName.remove(…)`, and
+`Transport.joinUrl`'s `trimEnd`/`trimStart`, are value-returning calls, so `STRONGER` seeds nothing on them
+(`joinUrl` gets one placeholder mutant, killed trivially). Under `NON_VOID_METHOD_CALLS` those lines do get
+mutants — and every one is already killed. So the direct answer is **no, mutation testing would not have caught
+what the humans caught.** It finds wrong implementations, not missing checks.
+
+**It found one thing a human found too:** ticket-21 item 6, the empty `200` body. `decodeSystemOneResponse`
+carries 11 survivors on its `parseBody(...) as? JsonObject` / `answers as? JsonObject` guards. A test sending
+`""` as a 200 body and asserting the failure kills them. The bigger cluster is malformed-input decoding in
+`ErrorMapping.kt` (37 unpinned), `Client.kt` (26), `Answers.kt` (20) — right key with the wrong JSON type,
+array where object expected, the `Retry-After` boundaries — none of which a fixture travels.
+
+**Two ticket-21 premises the measurements contradict** (reported, not acted on): item 3's "nothing tests it" is
+false — `TransportTest.kt:447` gives the shared helper a trailing-slash `baseUrl` and `:269` asserts the exact
+URL; and item 2's "exact-case spelling only" is false — the `"accept"`/`"Accept"` pair is asserted at
+`TransportTest.kt:310-312` with the retry-count `assertNull` right after, and PIT kills both mutants on those
+lines when it can see them.
+
+**Costs, stated.** Only the JVM compilation is measurable: 5 of 14 source files have Apple/Linux `actual`s PIT
+never sees. The conformance fixtures are worth about **1 kill of 534**, so they are not a mutation-gate
+workhorse. A gate has no safe threshold — at 716 covered mutants one mutant is 0.14pp and the measured flip
+rate is 0.8%, so any line within a point of 74.6% is a coin flip; it would also quadruple a `check` that
+currently finishes in 41 s here.
+
+**Left undone, deliberately.** The 157 unpinned mutants are classified, not fixed — pinning them is ticket 21's
+job, not a measurement ticket's. Whether `NON_VOID_METHOD_CALLS` joins `STRONGER` is recorded as an open choice
+for a follow-up rather than decided here. Arcmutate's licence was not purchased: its inline-code correction
+would fix the 6% misattribution, but no commercial Kotlin mutator has a target in this source.
+
+**Gate.** `./gradlew check --rerun-tasks` green (Android SDK needed `ANDROID_HOME`; unset in this shell had
+failed `:testAndroidHostTest` before any of this branch's changes). `apiCheck`, `koverVerify`, `dokkaGenerate`
+and both ktlint lanes all pass; both generated POMs contain zero references to `pitest` or `arcmutate`.
