@@ -23,8 +23,20 @@ configuration parameters and nowhere else in the public surface.
 ./gradlew check
 ```
 
-`check` runs ktlint, the public-API dump comparison, the version/CHANGELOG consistency check, and every test
-target the current host can execute.
+`check` runs ktlint, the public-API dump comparison, the version/CHANGELOG consistency check, the coverage
+floor, and every test target the current host can execute.
+
+## Running the live API tests
+
+The live tier hits the real API, so it is opt-in twice over — a Gradle property **and** an environment
+variable — and a default `./gradlew check` can never reach the network or spend money:
+
+```bash
+TYPESAFE_API_KEY=… ./gradlew jvmTest -Ptypesafe.live=true
+```
+
+`integration.yml` runs the same command nightly and on every push to `main`, using the `JEV_API_KEY`
+repository secret.
 
 ## Compatibility
 

@@ -6,11 +6,13 @@ import com.sierranevadalabs.jev.sdk.errors.errorFor
 import com.sierranevadalabs.jev.sdk.errors.parseBody
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.http.HttpMethod
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlin.random.Random
 import kotlin.time.Duration
 
 /**
@@ -74,6 +76,8 @@ internal fun createClient(
     config: TypeSafeConfig,
     env: (String) -> String? = ::platformEnv,
     engineFactory: () -> HttpClientEngine = ::createDefaultEngine,
+    random: () -> Double = { Random.nextDouble() },
+    sleeper: suspend (Long) -> Unit = { delay(it) },
 ): TypeSafeClient {
     val resolved = ResolvedConfig(config, env)
     val transport =
@@ -86,6 +90,8 @@ internal fun createClient(
             retryPolicy = config.retry,
             httpClientConfig = config.httpClientConfig,
             engineFactory = engineFactory,
+            random = random,
+            sleeper = sleeper,
         )
     return TypeSafeClientImpl(transport, resolved.defaultModel)
 }
