@@ -1,7 +1,7 @@
 # Prototype the typed question API
 
 Type: prototype
-Status: claimed
+Status: resolved
 Blocked by:
 
 ## Question
@@ -149,14 +149,18 @@ breaks at compile time when a primitive is added, the same way consumers' `when 
 
 ### Bends, and the one thing I stopped on
 
-8. **`AnswerTypeMismatchException`'s base class is not decided anywhere I can find.** The brief §7 says it
+8. **`AnswerTypeMismatchException`'s base class — decided: `ClassCastException`.** The brief §7 says it
    lives at the root, out of `.errors`, "a programming error, and nothing from the network can produce it",
    which narrows it to an unchecked exception but names no class; §11's verbatim-from-the-siblings rule
    cannot help, because neither sibling has this type (JS enforces it at compile time, Python does not have
-   it). The prototype had to pick one to compile, and picked `IllegalStateException`.
-   **Confirm `IllegalStateException` or name another — `IllegalArgumentException`, `ClassCastException` and
-   plain `RuntimeException` are all defensible — before ticket 11 freezes the dump.** That is the only
-   thing between this ticket and `resolved`; everything else above is settled.
+   it). The prototype picked `IllegalStateException` to compile. **The owner's call was never made, so the
+   recommendation on record was applied to unblock the chain — reversible in one line in ticket 11, since
+   nothing is published yet and ticket 11 is the only producer.** It is `ClassCastException`: the accessor
+   *is* a checked cast, `ClassCastException` is exactly what the unchecked version threw in the measurement
+   above (`class ChoiceAnswer cannot be cast to class NoulAnswer`), so keeping the family means the failure
+   a caller sees changes message and timing but not type. `IllegalStateException` was the weakest of the
+   four candidates because the *response's state* is not what is wrong; its *type* is.
+   `kotlin.ClassCastException` exists in common stdlib, so every declared target has it.
 9. Missing-key behaviour is **not** decided here: ticket 11's own brief already says to *"decide and test
    the behaviour rather than letting it fall out"*. The prototype's placeholder is `NoSuchElementException`
    from `get`, `null` from `answerOrNull`, and ticket 11 owns the real answer (including the

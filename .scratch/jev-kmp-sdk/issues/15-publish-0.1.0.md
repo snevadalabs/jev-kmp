@@ -8,6 +8,8 @@ Blocked by: 13, 14, 18
 
 Nothing to decide — everything is built and gated. This ticket is the human-in-the-loop release, and it is the only ticket on the map that cannot be finished by an agent alone.
 
+**[noted by the parent before dispatch]** Two prerequisites are missing and one is stale. The repo's GitHub Actions minutes are exhausted — every job fails in 9s without starting, and `check.yml` is disabled — and the Portal credentials and signing key are not repository secrets. **So do not tag or push `v0.1.0`:** `publish.yml` still triggers on `v*`, the run cannot start, and the tag would be an orphan pointing at a commit no CI ever verified. A tag is cheap to make and socially expensive to walk back. Do the parts that are safe — cut the `0.1.0` CHANGELOG section, commit the API dump, run the gate locally with `./gradlew check` — and report exactly what the human must do first. Steps 2 and 4 lose their CI half until billing is restored. Also stale: prerequisite 4 ("create the remote repository") is done, `snevadalabs/jev-kmp` exists and is pushed.
+
 **Human prerequisites** (from *Establish Maven Central publishing* — fill in the exact steps there, do not re-derive them here):
 
 1. Register and verify the `com.sierranevadalabs` namespace on the Sonatype Central Portal.

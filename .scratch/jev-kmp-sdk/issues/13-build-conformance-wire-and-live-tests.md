@@ -12,6 +12,8 @@ Read [research/04-ktor-transport-mechanics.md](../research/04-ktor-transport-mec
 
 Nothing to decide — the fixture format and the SDK both exist; this wires the three test tiers the effort was justified by.
 
+**[noted by the parent before dispatch]** `check.yml` is currently `workflow_dispatch`-only: GitHub Actions is billing-blocked on this private repo, so nothing runs on a push or a pull request. Wire the coverage gate into the file anyway — the wiring is the deliverable — and verify locally with the coverage task by name and `./gradlew check`. Do not try to prove it through GitHub and do not restore the triggers. `integration.yml` is new, so it has no such history.
+
 **Tier 1 — conformance fixtures.** The `commonTest` loader from *Settle the conformance fixture format* runs every fixture case in `conformance/` against the real client over `MockEngine`. This is the suite that must be runnable *unchanged* by the Python and JS suites; if a case needed a Kotlin-specific tweak, the format is wrong and the format is what changes, not the fixture.
 
 **Tier 2 — wire and socket tests.** A real engine against a real local socket, the way the JS SDK's `native-transport.test.ts` does. Pick Ktor's CIO engine bound to `127.0.0.1:0` for the JVM source set. Assertions that a `MockEngine` cannot make honestly:
