@@ -1,7 +1,7 @@
 # Prototype the typed question API
 
 Type: prototype
-Status: open
+Status: claimed
 Blocked by:
 
 ## Question
