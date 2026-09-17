@@ -3,6 +3,7 @@ package com.sierranevadalabs.jev.sdk.conformance
 import com.sierranevadalabs.jev.sdk.Answer
 import com.sierranevadalabs.jev.sdk.ChoiceAnswer
 import com.sierranevadalabs.jev.sdk.NoulAnswer
+import com.sierranevadalabs.jev.sdk.NoulCriteria
 import com.sierranevadalabs.jev.sdk.Question
 import com.sierranevadalabs.jev.sdk.RetryPolicy
 import com.sierranevadalabs.jev.sdk.ScoreAnswer
@@ -246,7 +247,10 @@ private fun JsonElement.toQuestions(): List<Question<*>> =
         val question = element.jsonObject
         val prompt = question.getValue("instructions")
         when (val type = question.getValue("type").jsonPrimitive.content) {
-            "noul" -> noul(id, prompt)
+            "noul" -> {
+                val criteria = question["criteria"]?.jsonObject?.let { NoulCriteria(it["true"], it["false"]) }
+                noul(id, prompt, criteria)
+            }
             "choice" -> choice(id, prompt, question.getValue("criteria").jsonObject)
             "score" -> score(id, prompt, question.getValue("criteria").jsonArray.map { it })
             else -> fail("no question builder for fixture type '$type'")

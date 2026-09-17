@@ -106,7 +106,10 @@ internal class TypeSafeClientImpl(
     private val defaultModel: String,
 ) : TypeSafeClient {
     // The resource gets a closure, not the transport, so it never has the API key in reach.
-    override val models: Models = ModelsApi { request(HttpMethod.Get, "/v1/models") }
+    override val models: Models =
+        ModelsApi { timeout, retry ->
+            request(HttpMethod.Get, "/v1/models", timeout = timeout, retry = retry)
+        }
 
     override suspend fun systemOne(
         state: JsonElement,

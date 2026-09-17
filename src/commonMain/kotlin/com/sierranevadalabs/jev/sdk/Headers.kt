@@ -7,7 +7,7 @@ package com.sierranevadalabs.jev.sdk
 internal const val SDK_NAME = "typesafe-sdk-kotlin"
 
 /** Kept in step with `gradle.properties` by the `checkVersion` task; it is the public release version. */
-internal const val SDK_VERSION = "0.1.0"
+public const val SDK_VERSION: String = "0.1.0"
 
 internal const val AUTHORIZATION_HEADER = "Authorization"
 internal const val ACCEPT_HEADER = "Accept"

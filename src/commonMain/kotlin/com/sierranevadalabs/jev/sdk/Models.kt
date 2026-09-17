@@ -6,19 +6,27 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlin.time.Duration
 
 /** The model catalogue: what the API can be asked with. Reached as `client.models`. */
 public interface Models {
     /**
      * Returns every model the API offers, from `GET /v1/models`.
      *
+     * @param timeout the per-attempt request timeout for this call, or `null` for the client's configured
+     *   default. Exactly as on [TypeSafeClient.systemOne].
+     * @param retry the retry policy for this call, or `null` for the client's configured default. Exactly as
+     *   on [TypeSafeClient.systemOne].
      * @throws com.sierranevadalabs.jev.sdk.errors.APIResponseValidationError if a 200 body is not
      *   `{ models: [...] }` with a string `name` on every entry — a server-side contract break, not a caller
      *   error.
      * @throws com.sierranevadalabs.jev.sdk.errors.JevError for a failed call. Retry and the status-to-error
      *   mapping have already been applied by the client.
      */
-    public suspend fun list(): List<ModelCard>
+    public suspend fun list(
+        timeout: Duration? = null,
+        retry: RetryPolicy? = null,
+    ): List<ModelCard>
 }
 
 /**
@@ -54,10 +62,13 @@ public data class Usage(
  * closure returns.
  */
 internal class ModelsApi(
-    private val fetch: suspend () -> TransportResponse,
+    private val fetch: suspend (Duration?, RetryPolicy?) -> TransportResponse,
 ) : Models {
-    override suspend fun list(): List<ModelCard> {
-        val response = fetch()
+    override suspend fun list(
+        timeout: Duration?,
+        retry: RetryPolicy?,
+    ): List<ModelCard> {
+        val response = fetch(timeout, retry)
         val payload = parseBody(response.body) as? JsonObject
         val models = payload?.get("models") as? JsonArray
         if (models == null) {

@@ -15,9 +15,10 @@ Initial release.
 - The SDK is usable end to end: `TypeSafeClient`, its environment-aware configuration, `client.models.list()`,
   and the twelve-class error tree under `com.sierranevadalabs.jev.sdk.errors`.
 - Typed questions and answers for all three System One primitives — `noul`, `choice`, and `score` — where the
-  question object is itself the statically typed key for reading its answer.
+  question object is itself the statically typed key for reading its answer. A `noul` question describes its yes
+  and no outcomes with `NoulCriteria`.
 - Retry with the JS delay policy on Ktor's `HttpRequestRetry`, plus per-call `RetryPolicy`, `model`, and
-  `timeout` overrides.
+  `timeout` overrides; `client.models.list()` takes the same per-call `timeout` and `retry`.
 - Opt-in logging: `LogLevel` and `TypeSafeConfig.logLevel` (or `TYPESAFE_LOG_LEVEL`), off by default, writing one
   line per call and one per retry and never a header, a body or the API key.
 - Targets: JVM, Android, `iosArm64`, `iosSimulatorArm64`, `iosX64` (compile-only), `macosArm64`, `linuxX64`.

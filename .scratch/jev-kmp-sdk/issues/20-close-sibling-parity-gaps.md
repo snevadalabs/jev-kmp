@@ -1,7 +1,7 @@
 # Close the three parity gaps a sibling audit turned up
 
 Type: task
-Status: claimed
+Status: resolved
 Blocked by: 11, 12
 
 ## Question
@@ -98,3 +98,40 @@ assertions `ClientTest` already makes for `systemOne`, including that `null` inh
 **Deliverable:** `NoulCriteria` and the `noul` parameter, the wire shape and its fixture, `models.list(timeout,
 retry)`, the public `SDK_VERSION`, the tests, `./gradlew apiDump`, and the README's parity/differences section
 brought back into line. `./gradlew check` green — Actions is off, so that is the only verification that runs.
+
+## Answer
+
+Type `task`; premise re-checked against the pre-claim tree and true — all three gaps were present.
+
+**1. `NoulCriteria`.** Public `data class NoulCriteria(ifTrue: JsonElement?, ifFalse: JsonElement?)` plus a
+secondary `(String?, String?)` constructor; `NoulQuestion` and both `noul` builders gained a defaulted
+`criteria`, so `noul("id", "prompt")` compiles unchanged. `toWireJson` emits
+`criteria: {"true"?, "false"?}`, omits an absent side and never sends `null`, and omits `criteria` entirely when
+none is given. `QuestionModelTest` pins the exact wire object for one side, both sides, neither and a structured
+(object/array) description. New `conformance/cases/request-noul-criteria.json` (both sides), replayed by the
+loader, whose `toQuestions` now parses noul criteria.
+
+**2. `models.list(timeout, retry)`.** `Models.list` takes `timeout: Duration? = null, retry: RetryPolicy? = null`;
+`ModelsApi`'s closure forwards both to the same `Transport.request` parameter `systemOne` uses, so `null`
+inherits. `ClientTest` asserts the per-call policy wins and that `null` inherits the client's. **Deliberately
+out:** `extraHeaders` (§5 defers per-call extra headers) and JS's `signal` (Kotlin cancellation is the
+coroutine's). Return type stays `List<ModelCard>` (§12).
+
+**3. Public `SDK_VERSION`.** `internal` → `public` (with the explicit `: String` `explicitApi(Strict)` demands);
+name, location and KDoc unchanged.
+
+**Finding — the ticket's `checkVersion` premise was false.** Going public *forces* an explicit `: String`, and
+the gate's regex `SDK_VERSION\s*=\s*"..."` then matched nothing, so it reported `[]` and stopped gating. Fixed
+the regex to accept an optional type annotation (`build.gradle.kts:270`) and proved it non-vacuous: flipped to
+`9.9.9` → `SDK_VERSION in src/ is [9.9.9], expected [0.1.0]`; reverted → green.
+
+**Finding — ADR 0005 says "15 cases is the cap".** This ticket directs a 16th, so the count assertion moved to
+16; ADR 0005 (owned by ticket 07) was not edited. Its Context note and the fixture set now disagree — a later
+ticket should reconcile.
+
+**Skipped:** JS's `ENV` — four public names that must track README prose, API nobody asked for.
+
+**Gate:** `./gradlew check` → BUILD SUCCESSFUL (ktlint, `apiCheck`, Dokka KDoc gate, `checkVersion`,
+`checkJvmBytecode`, Kover, and the JVM/Android/Apple/Linux test targets). `./gradlew apiDump` committed.
+
+Shipped on `issue-20-close-sibling-parity-gaps`, unmerged.

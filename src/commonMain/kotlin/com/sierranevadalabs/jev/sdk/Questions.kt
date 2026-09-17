@@ -39,7 +39,35 @@ public sealed interface Question<T : Answer> {
 public data class NoulQuestion(
     override val id: String,
     override val prompt: JsonElement,
+    /** Optional descriptions of the yes and no outcomes, or `null` for neither. */
+    public val criteria: NoulCriteria? = null,
 ) : Question<NoulAnswer>
+
+/**
+ * Optional descriptions of a [noul] question's yes and no outcomes, mirroring the siblings' noul criteria.
+ *
+ * On the wire these are the two optional keys `criteria.true` and `criteria.false`. An outcome with no
+ * description is omitted rather than sent as `null`, which is what both reference SDKs' encoders do. A
+ * description is a [String] or any other [JsonElement], so an object or array works too.
+ *
+ * @property ifTrue the description of the yes outcome, or `null` to omit it. Wire key `true`.
+ * @property ifFalse the description of the no outcome, or `null` to omit it. Wire key `false`.
+ */
+public data class NoulCriteria(
+    public val ifTrue: JsonElement?,
+    public val ifFalse: JsonElement?,
+) {
+    /**
+     * Both outcome descriptions as plain text.
+     *
+     * @param ifTrue the yes outcome's text, or `null`.
+     * @param ifFalse the no outcome's text, or `null`.
+     */
+    public constructor(
+        ifTrue: String? = null,
+        ifFalse: String? = null,
+    ) : this(ifTrue?.let(::JsonPrimitive), ifFalse?.let(::JsonPrimitive))
+}
 
 /** The question asked by [choice]. */
 public data class ChoiceQuestion(
@@ -57,17 +85,27 @@ public data class ScoreQuestion(
     public val levels: List<JsonElement>,
 ) : Question<ScoreAnswer>
 
-/** Asks a boolean question: is [prompt] true of the state? Reads back as a [NoulAnswer]. */
+/**
+ * Asks a boolean question: is [prompt] true of the state? Reads back as a [NoulAnswer].
+ *
+ * @param criteria optional descriptions of the yes and no outcomes.
+ */
 public fun noul(
     id: String,
     prompt: String,
-): NoulQuestion = NoulQuestion(id, JsonPrimitive(prompt))
+    criteria: NoulCriteria? = null,
+): NoulQuestion = NoulQuestion(id, JsonPrimitive(prompt), criteria)
 
-/** Asks a boolean question with a structured [prompt]. Reads back as a [NoulAnswer]. */
+/**
+ * Asks a boolean question with a structured [prompt]. Reads back as a [NoulAnswer].
+ *
+ * @param criteria optional descriptions of the yes and no outcomes.
+ */
 public fun noul(
     id: String,
     prompt: JsonElement,
-): NoulQuestion = NoulQuestion(id, prompt)
+    criteria: NoulCriteria? = null,
+): NoulQuestion = NoulQuestion(id, prompt, criteria)
 
 /**
  * Asks the model to pick one of [options]. Reads back as a [ChoiceAnswer].
@@ -160,6 +198,15 @@ internal fun Question<*>.toWireJson(): JsonObject =
             is NoulQuestion -> {
                 put("type", "noul")
                 put("instructions", question.prompt)
+                question.criteria?.let { criteria ->
+                    put(
+                        "criteria",
+                        buildJsonObject {
+                            criteria.ifTrue?.let { put("true", it) }
+                            criteria.ifFalse?.let { put("false", it) }
+                        },
+                    )
+                }
             }
             is ChoiceQuestion -> {
                 put("type", "choice")

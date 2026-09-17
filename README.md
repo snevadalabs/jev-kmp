@@ -75,8 +75,10 @@ not throw here. A failed call is logged too, at the level that is on, with the s
 No level writes a header, a body, the query string, or the API key. Every line is built from the method, path,
 status, duration and request id alone, so there is no redaction table that can be incomplete.
 
-## Differences from the Python and JavaScript SDKs
+## Parity and differences from the Python and JavaScript SDKs
 
+- **Noul criteria are ported.** A `noul` question describes its yes and no outcomes with `NoulCriteria`, encoded
+  exactly as the siblings encode them: a `criteria` object whose undescribed sides are omitted, never `null`.
 - **Suspend-only.** There is no blocking client, and no `AsyncTypeSafeClient` twin. Python's sync/async pair is
   two near-verbatim clients kept in step by hand; Kotlin needs one.
 - **Typed question keys.** The question object *is* the key: `choice("category", …)` is both the request and the
@@ -104,6 +106,9 @@ status, duration and request id alone, so there is no redaction table that can b
       retry = RetryPolicy(maxRetries = 0),
       timeout = 30.seconds,
   )
+
+  // The model catalogue takes the same two per-call overrides.
+  client.models.list(timeout = 30.seconds, retry = RetryPolicy(maxRetries = 0))
   ```
 
 - **A `score` question needs at least two levels.** Fewer is rejected locally with an `IllegalArgumentException`

@@ -15,7 +15,7 @@ class ConformanceFixturesTest {
         runTest {
             val cases = loadConformanceCases()
             // The proof set is deliberately capped: fixture sets rot once they grow past what anyone reads.
-            assertEquals(15, cases.size, "the proof set is fifteen cases")
+            assertEquals(16, cases.size, "the proof set is sixteen cases")
             cases.forEach { assertConformanceCase(it) }
         }
 

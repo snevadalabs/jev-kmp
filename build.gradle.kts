@@ -267,7 +267,9 @@ val checkVersion by tasks.registering {
                 .walkTopDown()
                 .filter { it.extension == "kt" }
                 .mapNotNull { file ->
-                    Regex("SDK_VERSION\\s*=\\s*\"([^\"]+)\"").find(file.readText())?.groupValues?.get(1)
+                    // `explicitApi(Strict)` forces an explicit return type on the public constant, so the type
+                    // annotation is optional here rather than absent.
+                    Regex("SDK_VERSION\\s*(?::\\s*\\w+)?\\s*=\\s*\"([^\"]+)\"").find(file.readText())?.groupValues?.get(1)
                 }.toList()
         check(declaredInSource == listOf(expected)) {
             "SDK_VERSION in src/ is $declaredInSource, expected [$expected] from gradle.properties"
