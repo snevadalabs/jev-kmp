@@ -1,7 +1,7 @@
 # Close the three parity gaps a sibling audit turned up
 
 Type: task
-Status: open
+Status: claimed
 Blocked by: 11, 12
 
 ## Question
