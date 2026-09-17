@@ -150,7 +150,8 @@ why. `./gradlew check` green.
 
 ## Answer
 
-**Done and shipped on this branch.** `./gradlew check` green, `apiDump` committed, PR opened. Mined
+**Done and shipped on this branch, unmerged — [PR #13](https://github.com/snevadalabs/jev-kmp/pull/13).**
+`./gradlew check` green, `apiDump` committed. Mined
 `typesafe-sdk-js/test/{errors,release-regressions,reliability,retry}.test.ts` and Python's
 `tests/{test_types,test_responses,test_docs}.py` (clones at `/tmp/ts-study/`). Nothing in sections A–C failed for a
 reason that is ours: every ported case describes what the code already does.
