@@ -1,17 +1,26 @@
 package com.sierranevadalabs.jev.sdk
 
 /**
- * The response to a `systemOne` call, as far as the answer model needs it.
+ * The response to a `systemOne` call.
  *
  * [answers] is the raw, always-available view; [get] and [answerOrNull] are the typed ones, keyed by the
  * [Question] that produced the answer. The request is not consulted, so an answer key the request never asked
  * for still appears in [answers], and a key the request asked for but the server omitted is simply absent.
  *
- * `model`, `usage`, `requestId`, `status` and `headers` join this class with the client and error tree.
+ * @property answers every answer the server returned, keyed by question id, including unknown primitives.
+ * @property model the model that answered, as the server named it.
+ * @property usage the token counters, or `null` when the server omitted them.
+ * @property requestId the server's `x-typesafe-request-id`, when it sent one.
+ * @property status the HTTP status of the response.
+ * @property headers every response header, as the server sent them.
  */
 public class SystemOneResponse(
-    /** Every answer the server returned, keyed by question id, including unknown primitives. */
     public val answers: Map<String, Answer>,
+    public val model: String? = null,
+    public val usage: Usage? = null,
+    public val requestId: String? = null,
+    public val status: Int = 200,
+    public val headers: Map<String, String> = emptyMap(),
 ) {
     /**
      * The answer to [question], statically typed.

@@ -10,4 +10,5 @@ enforces this, and the publish workflow runs it before anything is uploaded.
 
 ## [Unreleased]
 
-Nothing yet. `0.1.0` is in development and nothing has been published.
+- The SDK is usable end to end: `TypeSafeClient`, its environment-aware configuration, `client.models.list()`,
+  and the twelve-class error tree under `com.sierranevadalabs.jev.sdk.errors`.

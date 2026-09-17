@@ -1,7 +1,7 @@
 # Implement the client and error tree
 
 Type: task
-Status: claimed
+Status: resolved
 Blocked by: 10, 11
 
 ## Question
@@ -34,3 +34,70 @@ Nothing to decide — assemble the public entry point and the error hierarchy on
 Deliverable: client, models, errors, and tests.
 
 ## Answer
+
+**Built, gated, green.** Branch `issue-12-client-and-error-tree`, shipped unmerged as PR #6.
+
+### What landed
+
+`src/commonMain/kotlin/com/sierranevadalabs/jev/sdk/`
+
+- **`Client.kt`** — `interface TypeSafeClient : AutoCloseable` with `val models` and the one abstract
+  `systemOne(JsonElement, vararg Question<*>, model, timeout, retry)`, the `String`-state extension beside it, a
+  top-level `fun TypeSafeClient(config)` factory over an internal `createClient(config, env, engineFactory)`, and
+  the internal impl. The brief §9/§12 amendments fixed this shape, so the ticket's "regular class" line was read
+  as the anti-`data class` rule it is: nothing generated or written prints the key, and the interface is what
+  ticket 16 froze. `close()` is graceful and idempotent; the engine is closed only when the client created it.
+- **`Config.kt`** — `TypeSafeConfig` (plain class; its `toString()` omits `apiKey` *and* `defaultHeaders`),
+  `ResolvedConfig` for `explicit → env → default` with the siblings' names and defaults, blank/whitespace-only
+  env ignored, missing key → `JevError`.
+- **`Models.kt`** — `interface Models`, `client.models.list()` → `List<ModelCard>`, `ModelCard`, `Usage`.
+  `ModelsApi` holds a closure over the client's request path, never the transport, so the key is out of reach.
+- **`errors/`** — the 12-class tree with the parent's names (`JevError` root, `APIError`, the seven status
+  classes, `APIConnectionError`/`APITimeoutError`, `APIResponseValidationError`); every constructor is `internal`
+  (catch-only — nothing asked for constructible errors); the single `errorFor` status mapping; and
+  `extractErrorMessage` covering every shape ADR 0005 lists, capped at 200 chars with an ellipsis.
+- `Platform.kt` + all four actuals grew `expect fun platformEnv` (JVM/Android `System.getenv`, Apple
+  `NSProcessInfo`, Linux `getenv`, opted into `ExperimentalForeignApi`). `Transport.kt` grew an internal
+  `engineFactory` so engine ownership is observable. `SystemOneResponse` gained `model`, `usage`, `requestId`,
+  `status` and `headers`, all defaulted so ticket 11's tests are untouched.
+
+### Evidence
+
+`./gradlew check` → **BUILD SUCCESSFUL** (51 tasks). The 83 tests are green on all four runnable targets —
+`jvmTest`, `testAndroidHostTest`, `macosArm64Test`, `iosSimulatorArm64Test`, 83 / 0 failures each. `linuxX64Test`
+compiles and links and is SKIPPED on this macOS host, as CI's Linux lane expects; no simulator contention.
+`dokkaGenerate` and `apiCheck` green. `api/jvm/jev-kmp.api` reviewed and committed as a deliberate diff.
+
+26 new tests in three files: `ClientTest` (fixture round trip, per-call model/timeout/retry, the full status
+class table, the transport-failure branch, malformed answer, usage absent, local validation, models happy and
+bad shape, the API-key leak set, lifecycle), `ErrorMappingTest` (all five error fixtures' `expect.message`
+extracted from their own bytes, the ADR 0005 shapes, the truncation cap, the status table), `ConfigTest`
+(precedence, blank env, names/defaults, missing key, non-positive timeout). The API-key test was written first:
+`compileTestKotlinJvm` failed on unresolved references, then the class made it pass.
+
+Two measured corrections, recorded in the tests rather than argued away:
+
+- **Ktor carries `Content-Type` on the outgoing body, not in the request's headers.** At the `MockEngine`
+  boundary `request.headers["Content-Type"]` is `null` while `request.body.contentType` is
+  `application/json`, and the engine writes the header on the wire. `assembleHeaders` still force-sets it, so a
+  caller still cannot substitute one; the round-trip test pins the body property (`ClientTest.kt:66`).
+- **The public error's `cause` is the original engine failure, not the internal `TransportException` wrapper**, so
+  no internal type appears in a caller's `cause` chain.
+
+### Deliberately left undone
+
+- **The per-call log line and `TYPESAFE_LOG_LEVEL`.** The map lists them as graduating from the client ticket,
+  but neither is in this ticket's deliverable, the transport already emits the per-retry line, and the per-call
+  line needs a clock seam. No `logLevel` field ships in `TypeSafeConfig`.
+- **The `Usage.billing_units` shim.** `Usage` reads the two fields the wire sends and does not require
+  `billing_units` — which is what the fixture pins — so the shim question stays with ticket 13.
+- **`map.md` was not touched**, per the parent's instruction.
+
+### Picked up by ticket 13
+
+The fixture mapping is now a pure name match: `expect.error` → the class name, `expect.message` →
+`Exception.message` (all five error fixtures already assert the extraction against their own bytes), and
+`expect.field` → `APIResponseValidationError.field` (the malformed-answer fixture's `answers.urgent.noul` is
+pinned by `ClientTest.aMalformedAnswerFailsWithTheFieldPath`). `ClientTest` already drives the real client over
+`MockEngine` using a fixture's own request and response, so the loader's stub in `conformance/Conformance.kt`
+can be replaced with the same call.
