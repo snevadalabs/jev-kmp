@@ -1,0 +1,64 @@
+# Map — Jev Kotlin Multiplatform SDK
+
+**Label:** `wayfinder:map`
+**Effort:** `jev-kmp-sdk`
+**Tracker:** local markdown (`.scratch/jev-kmp-sdk/`) — this folder has no git remote, so there is nothing for `gh` or `glab` to talk to.
+
+## Destination
+
+A published, CI-gated Kotlin Multiplatform SDK for the TypeSafe / Jev System One API — `com.sierranevadalabs:jev-kmp` `0.1.0` on Maven Central, covering JVM + Android + Apple + Linux x64, built on Ktor behind an injectable engine seam, shipping a cross-language wire-conformance fixture suite and an enforced public-API dump, with a test suite that actually gates the release.
+
+## Notes
+
+**Domain.** Jev is TypeSafe's System One model. The API takes a `state` and a map of typed `questions` and returns structured `answers`.
+
+| Primitive | Question | Answer fields |
+|---|---|---|
+| Noul | is this true? | `noul` (0–1) |
+| Choice | pick one option | `choice`, `probabilities`, `confidence` |
+| Score | rate on ordered levels | `score`, `legend`, `probabilities`, `confidence` |
+
+Wire: `POST /v1/systemone` `{state, model, questions}` → `{model, answers, usage}`; `GET /v1/models`. All three primitives mix in one call. Answer keys mirror question keys. Errors: `401`, `422`, `429`, `529`; response header `x-typesafe-request-id`.
+
+**Reference material.** Recon of both official SDKs (v0.6.0 each) is in `research/reference-typesafe-sdk-python-recon.md` and `research/reference-typesafe-sdk-js-recon.md`. Live clones of both, plus `system-one-adapter-python`, are at `/tmp/ts-study/`. The TypeSafe docs index is at `https://docs.typesafe.ai/llms.txt`.
+
+**Skills every session should consult.** `tdd` (one runnable check per behaviour, test-first); `codebase-design` (where the seams go — the engine seam is the load-bearing one); `domain-modeling` (write an ADR the moment a hard-to-reverse decision is made); `research` (for tickets typed `research`); `prototype` (for tickets typed `prototype`).
+
+**Execution is in scope.** This effort overrides the wayfinder default of "plan, don't do": tickets resolve a decision *and* land the code it implies. Still **one ticket per session** — research tickets are the only exception and may run in parallel.
+
+**Wayfinding mechanics for this tracker.** A ticket is a file in `issues/`. `Type:`, `Status:` and `Blocked by:` are read from the top of the file. Claim a ticket by setting `Status: claimed` *before* any work. A ticket is on the frontier when it is `Status: open`, not claimed, and every file in its `Blocked by:` list is `Status: resolved`. Open tickets are not listed here — query the directory. Research output is written to `research/<NN>-<slug>.md` and linked from the ticket's `## Answer`, never pasted in.
+
+## Decisions so far
+
+<!-- one line per closed ticket: enough to judge relevance, then zoom the link for the detail the ticket holds -->
+
+- [Lock the v0.1 design brief](issues/01-lock-v0.1-design-brief.md) — 18 locked decisions covering destination, coordinates, targets, stack, parity scope, concurrency model, retry, config, observability, toolchain, and the conformance-fixture approach. **Read this first, every session.**
+- [Pin the KMP toolchain and target matrix](issues/02-pin-kmp-toolchain-and-targets.md) — Kotlin 2.3.21 (language level 2.1) + Ktor 3.5.2 + Gradle 9.3.0 + AGP 9.0.0; Android via the mandatory `com.android.kotlin.multiplatform.library` plugin; minSdk 28, bytecode 1.8, iOS 13.0. Every pin re-derived from Maven Central, which is how we caught Ktor 3.6.0 where search still said 3.5.2.
+- [Establish Maven Central publishing](issues/03-establish-maven-central-publishing.md) — `com.sierranevadalabs` is reachable **only** by DNS TXT control of `sierranevadalabs.com`; no GitHub-org namespace path exists. OSSRH is dead. vanniktech 0.37.0 releases via the Central Portal; one macOS CI job for Apple; the live tier lives in a separate workflow.
+- [Recon Ktor transport mechanics](issues/04-recon-ktor-transport-mechanics.md) — Ktor's built-in `HttpRequestRetry` is far more capable than assumed (injectable `delay`, per-attempt header mutation, per-request policy), which undercuts the reasoning for a hand-rolled loop. `HttpTimeout` disarms when the pipeline returns, so we own the body deadline ourselves. Thirteen enumerated gaps in the closing section.
+- [Survey established Kotlin SDK patterns](issues/05-survey-established-kotlin-sdk-patterns.md) — **all four** mature KMP SDKs ship `interface` + `internal impl` + factory and none exposes a concrete client class; every typed accessor gets an `OrNull` twin; never `enum class` on a server-owned string; one module; the exact `explicitApi` + BCV + `apiCheck` config to copy.
+- [Reconcile the client shape and answer access with the Kotlin SDK survey](issues/16-reconcile-client-shape-and-answer-access.md) — the client is an **interface** + `internal` impl + factory, with `models` as a nested resource object (openai-kotlin's flat grouping was rejected: `client.list()` reads as *list what?*). The **typed key is the wire question** — the `"id" to …` infix is dropped, so `choice("category", "prompt", options)` is both the request and the statically typed key. `r[key]` throws `AnswerTypeMismatchException`, `r.answerOrNull(key)` returns null, `UnknownAnswer` survives only in `r.answers`. Ktor appears in exactly two config parameters. No `@InternalJev` marker at 0.1.0. **Corrected brief §4, §5, §7, §9, §12, §14**, and re-scoped [Prototype the typed question API](issues/06-prototype-typed-question-api.md), whose premise had included the dropped infix. Its sharpest finding: the fakeability the interface shape is universally justified by is **zero-demonstrated** — no fake client exists in openai-kotlin, supabase-kt, Python or JS.
+- [Reconcile retry against Ktor's built-in HttpRequestRetry](issues/17-reconcile-retry-vs-ktor-plugin.md) — Ktor's built-in `HttpRequestRetry` wins over brief §10's hand-rolled loop. Re-reading the pinned source at `37a29f9` collapsed three of the four gaps the ticket was opened on: `delayMillis(respectRetryAfterHeader = false)` stores our block verbatim, so the whole JS delay policy (both `Retry-After` forms and the `maxRetryAfter` cap) drops in; the non-`suspend` predicate never needs a body; and per-attempt error bodies have no consumer because §5 forbids logging bodies. `RetryPolicy` keeps the siblings' `Duration`-typed field set, per-call `retry: RetryPolicy?` is in, and OkHttp's invisible connection retries plus the absent caller-visible attempt count are accepted and documented. **Corrected brief §4, §5, §10, §11, §13**, rewrote ticket 08's ADR 0004 (which had not been written yet), and rewrote ticket 10's retry section.
+- [Confirm the Maven Central namespace](issues/18-confirm-maven-central-namespace.md) — Sierra Nevada Labs **does** control `sierranevadalabs.com` and its DNS, so the DNS-TXT route to `com.sierranevadalabs` is open and the brief's coordinates stand unchanged: `com.sierranevadalabs:jev-kmp`, package `com.sierranevadalabs.jev.sdk`. The `io.github.<username>` fallback is off the table and *Scaffold the repo and its CI gate* can encode the group id as written. The only remaining namespace work is the one-time Portal Verification-Key TXT record at publish time, with the caveat that "Verify Namespace" must not be clicked before the record resolves.
+- [Scaffold the repo and its CI gate](issues/09-scaffold-repo-and-ci-gate.md) — `snevadalabs/jev-kmp` exists, is pushed, and its GitHub Actions gate is green on two lanes (Linux: ktlint + version/CHANGELOG check + `jvmTest` + `linuxX64Test`; macOS: `apiCheck` + Apple tests + Dokka, since it is the only host that can build every declared target). Two corrections to the toolchain matrix came out of the compiler rather than an argument: **`macosX64` cannot be declared** (Kotlin deprecated x86_64 macOS in 2.3.20, KGP 2.3.21 errors on it) and **`iosX64` is Tier 3, not Tier 1** — it stays, compile-only. And the map's Android-floor question is answered by falsifying its premise: **Ktor publishes no Android variant** of `ktor-client-core`/`ktor-client-okhttp`, so Android resolves the plain JVM JARs and nothing enforces a `minSdk` on us; 28 is our own choice. The `org.gradle.jvm.version` trap also does not fire — the attribute is absent, not 17. **Corrected brief §3** and the toolchain ticket's three carried-forward verifications.
+
+## Not yet specified
+
+<!-- in-scope fog toward the destination; graduates into tickets as the frontier advances -->
+
+- **The last bends in the frozen public API surface** — the typed accessor's exact spelling, and whether the convenience overloads resolve without help at every call site. The surface itself is now fixed by *Reconcile the client shape and answer access with the Kotlin SDK survey*; only what compiling code reveals stays open. Graduates from *Prototype the typed question API*.
+- **The conformance fixture manifest** — exactly what `manifest.json` declares and how a foreign-language loader discovers cases. Graduates from *Settle the conformance fixture format*.
+- **Whether `usage` needs a shim** — the OpenAPI schema requires a `billing_units` field the API never returns, and Python works around it by redefining the type. Graduates from *Build the conformance, wire, and live test tiers*.
+- **What upstream does with the fixtures** — whether they are adopted as-is, moved to a shared repo, or ignored. Graduates from the publish ticket.
+
+## Out of scope
+
+<!-- beyond the 0.1.0 destination; closed, never graduates -->
+
+- **JS and Wasm targets.** The build is KMP-shaped from line one specifically so this is additive later, but a `fetch` engine and a second async model are a v0.2 concern.
+- **A blocking / `runBlocking` JVM facade shipped by us.** `runBlocking` is one line for a caller who wants it; shipping it is a footgun on Android's main thread.
+- **KSP or Gradle-plugin codegen for typed questions.** The typed-key API gets the same safety without a compiler plugin.
+- **A published documentation site, and a `samples/` Gradle module.** README + Dokka + `explicitApi()`-enforced KDoc; the README *is* the sample.
+- **`extra_body`, a pluggable `Logger` abstraction, and per-call extra headers.** Deferred in the design brief; logging stays on/off only.
+- **Python's whole-retry-budget timeout.** Per-attempt timeout plus the `maxRetryAfter` cap, nothing more, until someone asks.
+- **Upstream `ai.typesafe:*` coordinates.** We ship our own group id; a handover is a Maven-only change.

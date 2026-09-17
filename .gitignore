@@ -6,9 +6,6 @@ build/
 # Local machine configuration (SDK paths, secrets)
 local.properties
 
-# Wayfinder planning tracker — deliberately local, never published
-.scratch/
-
 # IDE
 .idea/
 *.iml
