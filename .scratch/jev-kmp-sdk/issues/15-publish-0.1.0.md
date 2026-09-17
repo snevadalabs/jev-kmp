@@ -1,7 +1,7 @@
 # Publish 0.1.0 to Maven Central
 
 Type: task
-Status: open
+Status: claimed
 Blocked by: 13, 14, 18
 
 ## Question
