@@ -1,7 +1,7 @@
 # Implement the logging surface
 
 Type: task
-Status: claimed
+Status: resolved
 Blocked by: 12
 
 ## Question
@@ -57,3 +57,37 @@ Deliverable: `LogLevel`, the config field and its resolution, the sink seam, bot
 the README notes.
 
 ## Answer
+
+Built the whole deliverable. **Shipped, unmerged:** [PR #10](https://github.com/snevadalabs/jev-kmp/pull/10).
+
+**Code.** `LogLevel` (`Debug`/`Info`/`Warn`/`Error`/`Off`, public, KDoc states honestly what each emits);
+`TypeSafeConfig.logLevel` resolved `explicit → TYPESAFE_LOG_LEVEL → Off`, blank ignored, an unrecognised value
+rejected with a `JevError` naming the variable (siblings' five names, read case-insensitively, so `INFO` — which
+Python accepts — does not throw); `internal fun logSink(level, sink = ::println)` as the one gate and the one
+place `[typesafe-sdk]` is added. The transport takes `log` and `timeSource: TimeSource = TimeSource.Monotonic`;
+the retry subscription keeps its line through the same sink.
+
+**Lines.** `[typesafe-sdk] POST /v1/systemone <- 200 in 42ms (request req_123)`, request id omitted when the
+server sent none; a call that never got a response writes `… <- failed in 42ms (IOException)` — the class where a
+response would put its status, since the ticket's "failures" rule only names status-bearing ones and silence on an
+`APIConnectionError` would be the wrong kind of quiet; the retry line is unchanged (`retry 1: 503`). Nothing else
+is formatted: no headers, no bodies, no query string (`logPath` strips one), so the `apiKey` cannot reach a line
+by construction.
+
+**Evidence.** `./gradlew check` → `BUILD SUCCESSFUL` (ktlint, `apiCheck`, `checkVersion`, `checkJvmBytecode`,
+`koverVerify` at the 94 floor, `dokkaGenerate`, `allTests`): 95/95 tests on `macosArm64Test`,
+`iosSimulatorArm64Test` and `testAndroidHostTest`, 104/104 on `jvmTest`, 0 failures. `./gradlew apiDump` added
+`LogLevel` and `TypeSafeConfig.getLogLevel` to `api/jvm/jev-kmp.api` and nothing else public. The suite is
+non-vacuous, checked rather than assumed: flipping the gate to `if (true)` failed exactly
+`offByDefaultIsSilentForARealCall`, `theFiveLevelsGateEveryLine` and `theSinkPrefixesTheLineAndOnlyWhenTheLevelIsOn`;
+the mutation was reverted.
+
+**Left undone, deliberately.** No public `logger` field and no pluggable `Logger` abstraction — deferred, per the
+parent; `debug` emits the same two lines as `info` until that abstraction owns byte-level output; `warn`/`error` emit
+nothing for parity, because our failures are thrown. The retry line is still formatted when the level is off (the
+gate is in the sink), which costs one string per retry.
+
+**One process note, not a question.** `CHANGELOG.md` has no `Unreleased` heading — `gradle.properties` is `0.1.0`
+and `checkVersion` requires the top heading to name that version — so the user-noticeable line went under
+`## [0.1.0]`, which is itself unreleased. `local.properties` (the Android SDK path) is required for
+`testAndroidHostTest` and stays gitignored.
