@@ -1,7 +1,7 @@
 # Implement the client and error tree
 
 Type: task
-Status: open
+Status: claimed
 Blocked by: 10, 11
 
 ## Question
