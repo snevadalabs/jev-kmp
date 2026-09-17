@@ -1,4 +1,4 @@
-# Replicate the sibling test cases this suite does not have
+# Replicate the sibling test cases, and expose the resolved settings
 
 Type: task
 Status: open
@@ -7,9 +7,10 @@ Blocked by: 20
 ## Question
 
 Nothing to decide — the parent mined every test case name out of both sibling suites, diffed them against ours, and
-checked each candidate against our source. The list below is what to port. **These are pinning tests, not new
-behaviour: every one describes what the code already does.** If a mandated test fails, **stop and report** — that
-would mean our behaviour differs from the sibling, and that divergence is a decision, not something to fix quietly.
+checked each candidate against our source. Sections A to C are what to port, and all of it is **pinning tests, not
+new behaviour: every case describes what the code already does.** If a mandated test fails, **stop and report** —
+that would mean our behaviour differs from the sibling, and that divergence is a decision, not something to fix
+quietly. **Section D is the one exception**: it adds public API, and the parent has already made that call.
 
 **Method.** JS: all nine files in `typesafe-sdk-js/test/`, which is the siblings' whole regression surface and part
 of their `check`. Python: `typesafe-sdk-python/tests/test_*.py`. Both v0.6.0 clones at `/tmp/ts-study/`. Ours:
@@ -85,20 +86,36 @@ the extraction task to read fenced `kotlin` blocks out of `src/**/*.kt` KDoc too
 keep the non-vacuity check it already has passing. If that turns out to be more than a few lines, report why
 instead of building machinery.
 
-### D. Reported, not built
+### D. The client cannot report its resolved settings (build it)
 
-**JS exposes the resolved settings on the client; ours exposes none.** JS has `readonly baseURL, defaultModel,
-logLevel, retry, timeout, defaultHeaders`, pinned by "defaults to the SDK policy and exposes the resolved policy on
-the client". Our `TypeSafeClient` has `models` and `systemOne` only, so "what policy is actually in effect after
-`explicit → env → default`?" is unanswerable from code. That is a public-API decision and §5's parity list does not
-name introspection, so this ticket does not add it: **record a recommendation in the Answer** and the parent
-decides.
+**JS exposes the resolved settings; ours exposes none.** JS has `readonly baseURL, defaultModel, logLevel, retry,
+timeout, defaultHeaders`, pinned by "defaults to the SDK policy and exposes the resolved policy on the client". Our
+`TypeSafeClient` has `models` and `systemOne` only, so after `explicit → env → default` a caller cannot find out
+what actually took effect — which is the exact question our three-tier resolution invites ("did
+`TYPESAFE_BASE_URL` land?"). §5's parity list does not name introspection, so this was the parent's call to make:
+**add them.**
+
+- Six read-only properties on `TypeSafeClient` returning the **resolved** values — after env and defaults — for
+  `baseUrl`, `defaultModel`, `timeout`, `retry`, `logLevel`, `defaultHeaders`. Match JS's set: those six, no more.
+- **Never the apiKey.** JS keeps it in a `#private` field for exactly this reason. Do not expose it, and do not
+  expose the input `TypeSafeConfig` to get these six: that object carries the key *and* the unresolved input (the
+  `null` the env then filled), which is the opposite of the question being asked. `TypeSafeConfig.apiKey` is public
+  today as pre-existing surface — leave that alone, but do not widen it.
+- KDoc each property as the *effective* value with the resolution order stated once, and keep `explicitApi`
+  satisfied.
+- **Tests.** For the two values env can move (`baseUrl`, `defaultModel`) plus `logLevel`, assert all three sources:
+  the default with nothing set, the env value with only the env set, and the explicit value beating the env. For
+  `retry`, assert it reports the default policy when the caller passed none — the sibling's own case. `timeout` and
+  `defaultHeaders` have no env var, so one assertion each is enough.
+- `./gradlew apiDump`, and a README line in the parity/differences section: JS exposes the same six, and the apiKey
+  is exposed nowhere.
 
 **Tests.** The cases above, in the file each behaviour already lives in (`ClientTest`, `TransportTest`,
 `ErrorMappingTest`, `QuestionModelTest`, `WireTransportTest` as appropriate) — `kotlin.test` only, no new
 dependency, no new framework. Each ported case carries a one-line comment naming the sibling suite it came from,
 because the reason it exists is not visible from the code.
 
-**Deliverable:** the ported tests, the KDoc-snippet extension of the existing Gradle task, and an Answer saying
-which sibling files were mined, what was ported, what was checked and already covered, and what was deliberately
-not ported and why. `./gradlew check` green.
+**Deliverable:** the ported tests, the six resolved-settings properties on `TypeSafeClient` with their tests and
+`./gradlew apiDump`, the KDoc-snippet extension of the existing Gradle task, and an Answer saying which sibling
+files were mined, what was ported, what was checked and already covered, and what was deliberately not ported and
+why. `./gradlew check` green.
