@@ -26,7 +26,7 @@ jobs:
         with:
           packages: "platforms;android-36"
       - uses: gradle/actions/setup-gradle@v6
-      - run: ./gradlew ktlintCheck checkVersion jvmTest linuxX64Test
+      - run: ./gradlew ktlintCheck checkVersion checkJvmBytecode jvmTest linuxX64Test
 
   # The Apple lane, and the only host that can build every declared target — so the API dump comparison and
   # Dokka live here. iosSimulatorArm64Test is the Apple test that actually executes on an arm64 runner;

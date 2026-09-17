@@ -1,0 +1,28 @@
+public final class com/sierranevadalabs/jev/sdk/RetryPolicy {
+	public synthetic fun <init> (JJJDILjava/util/Set;ZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JJJDILjava/util/Set;ZZZLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-UwyO8pc ()J
+	public final fun component2-UwyO8pc ()J
+	public final fun component3-UwyO8pc ()J
+	public final fun component4 ()D
+	public final fun component5 ()I
+	public final fun component6 ()Ljava/util/Set;
+	public final fun component7 ()Z
+	public final fun component8 ()Z
+	public final fun component9 ()Z
+	public final fun copy-hTMF5Xc (JJJDILjava/util/Set;ZZZ)Lcom/sierranevadalabs/jev/sdk/RetryPolicy;
+	public static synthetic fun copy-hTMF5Xc$default (Lcom/sierranevadalabs/jev/sdk/RetryPolicy;JJJDILjava/util/Set;ZZZILjava/lang/Object;)Lcom/sierranevadalabs/jev/sdk/RetryPolicy;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getApiConnectionError ()Z
+	public final fun getApiTimeoutError ()Z
+	public final fun getBackoffInitial-UwyO8pc ()J
+	public final fun getBackoffJitter ()D
+	public final fun getBackoffMax-UwyO8pc ()J
+	public final fun getHttpStatuses ()Ljava/util/Set;
+	public final fun getMaxRetries ()I
+	public final fun getMaxRetryAfter-UwyO8pc ()J
+	public final fun getRespectRetryAfter ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
