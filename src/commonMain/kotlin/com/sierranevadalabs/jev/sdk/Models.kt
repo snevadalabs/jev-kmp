@@ -9,7 +9,15 @@ import kotlinx.serialization.json.JsonPrimitive
 
 /** The model catalogue: what the API can be asked with. Reached as `client.models`. */
 public interface Models {
-    /** Returns every model the API offers, from `GET /v1/models`. */
+    /**
+     * Returns every model the API offers, from `GET /v1/models`.
+     *
+     * @throws com.sierranevadalabs.jev.sdk.errors.APIResponseValidationError if a 200 body is not
+     *   `{ models: [...] }` with a string `name` on every entry — a server-side contract break, not a caller
+     *   error.
+     * @throws com.sierranevadalabs.jev.sdk.errors.JevError for a failed call. Retry and the status-to-error
+     *   mapping have already been applied by the client.
+     */
     public suspend fun list(): List<ModelCard>
 }
 

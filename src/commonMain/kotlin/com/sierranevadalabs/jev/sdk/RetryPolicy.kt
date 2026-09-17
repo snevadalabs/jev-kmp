@@ -10,6 +10,27 @@ import kotlin.time.Duration.Companion.seconds
  * The defaults mirror the official TypeSafe SDKs: two retries, a 500 ms initial backoff growing exponentially to
  * a 5 s ceiling, 25% subtractive jitter, and retries on 408, 429 and any 5xx.
  *
+ * ## What is retried
+ *
+ * A response whose status is in [httpStatuses], and a transport failure: a request timeout when [apiTimeoutError]
+ * is set, any other connection failure when [apiConnectionError] is. A caller's own cancellation never is.
+ *
+ * ## How long the wait is
+ *
+ * `round(min(backoffInitial * 2^attempt, backoffMax) * (1 - random * backoffJitter))`, in whole milliseconds,
+ * where `attempt` is `0` on the first retry. The jitter is subtractive, so no delay exceeds the exponential
+ * value. A server `retry-after-ms` or `Retry-After` replaces the backoff when [respectRetryAfter] is set and the
+ * value is at most [maxRetryAfter]; a larger value falls back to the backoff instead of waiting for it, which
+ * deliberately diverges from the Python SDK's uncapped honouring. With [respectRetryAfter] off, neither header
+ * form is read here, and `RateLimitError.retryAfterMs` is `null`.
+ *
+ * ## What this policy cannot see
+ *
+ * OkHttp may re-send a request after a connection failure through its own `retryOnConnectionFailure`, without
+ * this policy or any attempt count knowing, and the number of attempts is not visible to the caller.
+ *
+ * Every field is validated when the policy is built: an impossible combination throws [IllegalArgumentException].
+ *
  * @property backoffInitial delay before the first retry. Each further retry doubles it.
  * @property backoffMax ceiling of the exponential backoff, applied before jitter is subtracted.
  * @property maxRetryAfter largest server-supplied `retry-after-ms`/`Retry-After` this policy honours. A larger

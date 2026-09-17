@@ -13,7 +13,12 @@ import kotlinx.serialization.json.JsonPrimitive
  */
 public sealed interface Answer
 
-/** The answer to a [NoulQuestion]: the model's probability that the statement is true, in `0..1`. */
+/**
+ * The answer to a [NoulQuestion].
+ *
+ * @property noul the model's probability that the statement in the question is true, in `0..1`. `0.5` means yes
+ *   and no are equally likely; it is not a medium position on a scale.
+ */
 public data class NoulAnswer(
     public val noul: Double,
 ) : Answer
@@ -52,7 +57,11 @@ public data class ScoreAnswer(
  * A primitive this SDK version does not know, kept so that a newer server degrades instead of failing.
  *
  * A typed accessor never returns this variant — a [Question] cannot ask for it. It surfaces only through
- * [SystemOneResponse.answers].
+ * [SystemOneResponse.answers], so read that map if the server may be newer than this SDK.
+ *
+ * When a new primitive is modelled, [Answer] gains a variant, and every caller's exhaustive `when` over the
+ * hierarchy stops compiling. That is the intended failure, and it makes modelling a new primitive a
+ * source-breaking change: it ships in a minor or major release, never in a patch.
  *
  * @property type the server's `type` discriminator, verbatim.
  * @property raw the answer body, unparsed.

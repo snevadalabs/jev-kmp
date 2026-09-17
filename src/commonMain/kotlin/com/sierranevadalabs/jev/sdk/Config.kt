@@ -20,8 +20,13 @@ internal val DEFAULT_TIMEOUT: Duration = 10.seconds
  * `toString()` would print [apiKey] verbatim, so the explicit [toString] below omits it — and
  * [defaultHeaders], which can carry credentials too.
  *
- * Every value is resolved `explicit → env → default` when the client is built ([TypeSafeClient]), so leaving
- * a field `null` means "read the environment, then use the SDK's default".
+ * Every value is resolved when the client is built ([TypeSafeClient]), so leaving a field `null` means "read
+ * the environment, then use the SDK's default". Precedence is always explicit → environment → SDK default:
+ * [apiKey] reads `TYPESAFE_API_KEY` and has no default, [baseUrl] reads `TYPESAFE_BASE_URL` before
+ * `https://api.typesafe.ai`, [defaultModel] reads `TYPESAFE_DEFAULT_MODEL` before `jev-latest`, and [timeout]
+ * has no environment variable and defaults to 10 seconds. A blank or whitespace-only environment value counts
+ * as unset. The environment is read once, at construction; changing a variable later does not affect a client
+ * that already exists.
  *
  * @property apiKey the API key. `null` falls back to `TYPESAFE_API_KEY`; there is no default.
  * @property baseUrl the API root. `null` falls back to `TYPESAFE_BASE_URL`, then `https://api.typesafe.ai`.
@@ -46,6 +51,7 @@ public class TypeSafeConfig(
     public val engine: HttpClientEngine? = null,
     public val httpClientConfig: HttpClientConfig<*>.() -> Unit = {},
 ) {
+    /** The config as text. [apiKey] is deliberately absent, so a config cannot leak the key into a log. */
     override fun toString(): String = "TypeSafeConfig(baseUrl=$baseUrl, defaultModel=$defaultModel, timeout=$timeout, retry=$retry)"
 }
 
