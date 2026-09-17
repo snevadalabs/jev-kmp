@@ -1,7 +1,7 @@
 # Replicate the sibling test cases, and expose the resolved settings
 
 Type: task
-Status: open
+Status: claimed
 Blocked by: 20
 
 ## Question
