@@ -74,6 +74,11 @@ internal class ResolvedConfig(
     val timeout: Duration = config.timeout ?: DEFAULT_TIMEOUT
     val logLevel: LogLevel = resolveLogLevel(config.logLevel, env)
 
+    // No environment variable reaches either of these, so the resolved value is the configured one. They live
+    // here so every effective setting on the client comes from one object.
+    val retry: RetryPolicy = config.retry
+    val defaultHeaders: Map<String, String> = config.defaultHeaders
+
     init {
         require(timeout > Duration.ZERO) { "timeout must be positive, was $timeout" }
     }

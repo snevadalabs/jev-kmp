@@ -14,6 +14,8 @@ Initial release.
 
 - The SDK is usable end to end: `TypeSafeClient`, its environment-aware configuration, `client.models.list()`,
   and the twelve-class error tree under `com.sierranevadalabs.jev.sdk.errors`.
+- The client reports the settings that actually took effect — `baseUrl`, `defaultModel`, `timeout`, `retry`,
+  `logLevel` and `defaultHeaders` — after `explicit → environment → default`. The API key is exposed nowhere.
 - Typed questions and answers for all three System One primitives — `noul`, `choice`, and `score` — where the
   question object is itself the statically typed key for reading its answer. A `noul` question describes its yes
   and no outcomes with `NoulCriteria`.

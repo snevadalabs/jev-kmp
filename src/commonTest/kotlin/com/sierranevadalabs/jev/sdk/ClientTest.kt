@@ -23,10 +23,13 @@ import io.ktor.client.plugins.HttpTimeoutCapability
 import io.ktor.http.ContentType
 import io.ktor.http.Headers
 import io.ktor.http.HeadersBuilder
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.IOException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -109,6 +112,23 @@ class ClientTest {
         }
 
     @Test
+    fun aJsonNullStateIsSentRatherThanDropped() =
+        runTest {
+            // after python tests/test_types.py's "test_json_value_and_state_exclude_top_level_none": the wire
+            // wants an explicit `state` on every call, and a caller's JSON null is that value.
+            val engine = MockEngine { respond("""{"model":"jev-latest","answers":{}}""") }
+            val client = client(engine)
+
+            client.systemOne(JsonNull, noul("urgent", "?"))
+
+            val request = engine.requestHistory.single()
+            val body = Json.parseToJsonElement(request.body.toByteArray().decodeToString()).jsonObject
+            assertTrue(body.containsKey("state"), "the key is always sent")
+            assertEquals(JsonNull, body["state"])
+            client.close()
+        }
+
+    @Test
     fun perCallRetryPolicyReplacesTheClientsOwn() =
         runTest {
             val engine = MockEngine { respond("""{"error":{"message":"later"}}""", HttpStatusCode.ServiceUnavailable) }
@@ -165,6 +185,42 @@ class ClientTest {
         }
 
     @Test
+    fun rateLimitHasNoRetryAfterWhenTheServerSentNone() =
+        runTest {
+            // ported from typesafe-sdk-js/test/reliability.test.ts — "is undefined when the server sent no
+            // Retry-After". A sentinel 0 would read as a server instruction to retry immediately.
+            val engine = MockEngine { respond("""{"error":{"message":"slow down"}}""", HttpStatusCode.TooManyRequests) }
+
+            val failure = runCatching { client(engine).systemOne("hello", noul("urgent", "?")) }.exceptionOrNull()
+
+            assertNull(assertIs<RateLimitError>(failure).retryAfterMs)
+        }
+
+    @Test
+    fun aJsonErrorBodyIsParsedWhateverTheContentTypeSays() =
+        runTest {
+            // ported from typesafe-sdk-js/test/errors.test.ts — "parses JSON even when content-type is missing".
+            // The body is parsed from its bytes and content-type is never read, so a body claiming text/plain
+            // still yields its message instead of the raw text.
+            for (contentType in listOf(null, "text/plain")) {
+                val engine =
+                    MockEngine {
+                        respond(
+                            """{"error":{"message":"no content type"}}""",
+                            HttpStatusCode.BadRequest,
+                            contentType?.let { headersOf(HttpHeaders.ContentType, it) } ?: headersOf(),
+                        )
+                    }
+
+                val failure = runCatching { client(engine).systemOne("hello", noul("urgent", "?")) }.exceptionOrNull()
+
+                val badRequest = assertIs<BadRequestError>(failure, "content-type: $contentType")
+                assertEquals("no content type", badRequest.message)
+                assertEquals(Json.parseToJsonElement("""{"error":{"message":"no content type"}}"""), badRequest.body)
+            }
+        }
+
+    @Test
     fun mapsTransportFailuresToTheConnectionAndTimeoutBranch() =
         runTest {
             val connection =
@@ -172,6 +228,9 @@ class ClientTest {
                     client(MockEngine { throw IOException("connect failed") }).systemOne("hello", noul("urgent", "?"))
                 }.exceptionOrNull()
             assertIs<APIConnectionError>(connection)
+            // APITimeoutError is a subclass, so the narrower assertion alone would pass with the two mapped
+            // the wrong way round.
+            assertTrue(connection !is APITimeoutError, "a connection failure stays a connection failure")
             assertIs<IOException>(connection.cause)
             assertIs<JevError>(connection)
 
@@ -194,6 +253,54 @@ class ClientTest {
             val validation = assertIs<APIResponseValidationError>(failure)
             assertEquals("answers.urgent.noul", validation.field)
             assertEquals(200, validation.status)
+        }
+
+    @Test
+    fun decodeRejectsAnAnswersFieldThatIsNotAnObject() =
+        runTest {
+            // ticket 22's survivors on `decodeSystemOneResponse`'s `as? JsonObject` guards: the key is right
+            // and the JSON type is not.
+            for (body in listOf("""{"model":"jev-latest","answers":[]}""", """{"model":"jev-latest","answers":"none"}""")) {
+                val engine = MockEngine { respond(body) }
+
+                val failure = runCatching { client(engine).systemOne("hello", noul("urgent", "?")) }.exceptionOrNull()
+
+                val validation = assertIs<APIResponseValidationError>(failure, body)
+                assertEquals("answers", validation.field)
+                assertEquals("answers: expected an object field 'answers'", validation.message)
+            }
+        }
+
+    @Test
+    fun decodeTreatsAWrongJsonTypeOnModelAndUsageAsAbsent() =
+        runTest {
+            // ticket 22's survivors on the `as? JsonPrimitive` / `as? JsonObject` guards behind the response
+            // fields: a non-string model and non-numeric counters read as absent rather than failing the call.
+            val engine =
+                MockEngine {
+                    respond(
+                        """{"model":7,"answers":{"urgent":{"type":"noul","noul":0.5}},"usage":{"input_tokens":"12"}}""",
+                    )
+                }
+            val client = client(engine)
+
+            val response = client.systemOne("hello", noul("urgent", "?"))
+
+            assertNull(response.model, "a non-string model is absent, not a failure")
+            assertEquals(Usage(null, null), response.usage, "a stringified token counter decodes as absent")
+            client.close()
+
+            val structuredEngine =
+                MockEngine {
+                    respond("""{"model":{},"answers":{},"usage":{"input_tokens":{},"output_tokens":true}}""")
+                }
+            val structured = client(structuredEngine)
+
+            val structuredResponse = structured.systemOne("hello", noul("urgent", "?"))
+
+            assertNull(structuredResponse.model, "a structured model is absent, not a failure")
+            assertEquals(Usage(null, null), structuredResponse.usage, "a structured or boolean counter decodes as absent")
+            structured.close()
         }
 
     @Test
@@ -288,6 +395,28 @@ class ClientTest {
         }
 
     @Test
+    fun anEmpty200BodyFailsLoudlyInsteadOfReadingAsAnEmptyResult() =
+        runTest {
+            // ported from typesafe-sdk-js/test/release-regressions.test.ts — "returns a null-body response
+            // without trying to read a stream". Kotlin has no null body, so the analogue of that case is a 200
+            // whose body is empty: it must neither hang nor invent an empty answer map, and it must name what
+            // it was looking for.
+            val engine = MockEngine { respond("", HttpStatusCode.OK) }
+
+            val failure = runCatching { client(engine).systemOne("hello", noul("urgent", "?")) }.exceptionOrNull()
+
+            val validation = assertIs<APIResponseValidationError>(failure)
+            assertEquals("expected a JSON object response body", validation.message)
+            assertNull(validation.field, "there is no answer field to name")
+            assertEquals(200, validation.status)
+
+            val modelsFailure = runCatching { client(engine).models.list() }.exceptionOrNull()
+            val modelsValidation = assertIs<APIResponseValidationError>(modelsFailure)
+            assertEquals("models", modelsValidation.field)
+            assertTrue(modelsValidation.message!!.contains("GET /v1/models"), modelsValidation.message)
+        }
+
+    @Test
     fun theApiKeyNeverAppearsInAStringRepresentation() =
         runTest {
             val engine = MockEngine { respond("""{"error":{"message":"invalid api key"}}""", HttpStatusCode.Unauthorized) }
@@ -339,6 +468,71 @@ class ClientTest {
 
             val root = assertIs<JevError>(failure)
             assertTrue(root.message!!.contains("TYPESAFE_API_KEY"), root.message)
+        }
+
+    @Test
+    fun resolvedSettingsReportWhatTookEffectAfterEnvAndDefaults() =
+        runTest {
+            // ported from typesafe-sdk-js/test/reliability.test.ts — "defaults to the SDK policy and exposes the
+            // resolved policy on the client". Env is injected, so all three sources are observable.
+            val engine = MockEngine { respond("""{"models":[]}""") }
+            val env =
+                mapOf(
+                    BASE_URL_ENV to "https://from-env.test",
+                    DEFAULT_MODEL_ENV to "jev-env",
+                    LOG_LEVEL_ENV to "info",
+                )
+
+            val defaults = createClient(TypeSafeConfig(apiKey = "test-key", engine = engine), env = { null })
+            assertEquals(DEFAULT_BASE_URL, defaults.baseUrl)
+            assertEquals(DEFAULT_MODEL, defaults.defaultModel)
+            assertEquals(LogLevel.Off, defaults.logLevel)
+
+            val fromEnv = createClient(TypeSafeConfig(apiKey = "test-key", engine = engine), env = { env[it] })
+            assertEquals("https://from-env.test", fromEnv.baseUrl)
+            assertEquals("jev-env", fromEnv.defaultModel)
+            assertEquals(LogLevel.Info, fromEnv.logLevel)
+
+            val explicit =
+                createClient(
+                    TypeSafeConfig(
+                        apiKey = "test-key",
+                        engine = engine,
+                        baseUrl = "https://explicit.test",
+                        defaultModel = "jev-explicit",
+                        logLevel = LogLevel.Error,
+                    ),
+                    env = { env[it] },
+                )
+            assertEquals("https://explicit.test", explicit.baseUrl)
+            assertEquals("jev-explicit", explicit.defaultModel)
+            assertEquals(LogLevel.Error, explicit.logLevel)
+        }
+
+    @Test
+    fun resolvedRetryTimeoutAndHeadersReportTheEffectiveValues() =
+        runTest {
+            val engine = MockEngine { respond("""{"models":[]}""") }
+
+            val defaults = createClient(TypeSafeConfig(apiKey = "test-key", engine = engine), env = { null })
+            assertEquals(RetryPolicy(), defaults.retry, "the resolved policy is the SDK default when none was passed")
+            assertEquals(DEFAULT_TIMEOUT, defaults.timeout)
+            assertEquals(emptyMap(), defaults.defaultHeaders)
+
+            val configured =
+                createClient(
+                    TypeSafeConfig(
+                        apiKey = "test-key",
+                        engine = engine,
+                        retry = RetryPolicy(maxRetries = 7),
+                        timeout = 250.milliseconds,
+                        defaultHeaders = mapOf("X-Team" to "sdk"),
+                    ),
+                    env = { null },
+                )
+            assertEquals(RetryPolicy(maxRetries = 7), configured.retry)
+            assertEquals(250.milliseconds, configured.timeout)
+            assertEquals(mapOf("X-Team" to "sdk"), configured.defaultHeaders)
         }
 }
 

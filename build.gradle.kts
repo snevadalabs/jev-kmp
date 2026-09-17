@@ -57,59 +57,114 @@ val generateConformanceFixtures by tasks.registering {
     }
 }
 
-// The README's fenced ```kotlin blocks are compiled, so a snippet that no longer matches the public API breaks
-// the build instead of the reader. This is what Python's doc tests do with Sybil and what the JS repo lacks.
-// Each block must therefore be self-contained and must carry the imports a reader would copy. Kotlin allows
-// `import` only at file level, so the imports are hoisted to the top of the generated file — which also makes a
-// stale package or class name in a README import line a compile error.
-val generateReadmeSnippets by tasks.registering {
+// The README's fenced ```kotlin blocks and the ones inside our own KDoc are both compiled, so a snippet that no
+// longer matches the public API breaks the build instead of the reader. This is what Python's doc tests do with
+// Sybil and what the JS repo lacks. Each block must be self-contained and must carry the imports a reader would
+// copy. Kotlin allows `import` only at file level, so the imports are hoisted to the top of the generated file —
+// which also makes a stale package or class name in a README import line a compile error.
+//
+// A KDoc block is already written from inside the SDK's own package, so its snippets are generated into that
+// package (nothing to import) and take the client as a parameter: what the snippet documents is a call on a
+// client the reader already has, so there is no `val client = …` to copy. README snippets keep their own package
+// and construct their own client, so they stay no-argument functions.
+val generateDocSnippets by tasks.registering {
     val readme = layout.projectDirectory.file("README.md")
-    val output = layout.buildDirectory.dir("generated/readme/kotlin")
+    val sources = layout.projectDirectory.dir("src")
+    val output = layout.buildDirectory.dir("generated/docs/kotlin")
     inputs.file(readme).withPropertyName("readme")
+    inputs.dir(sources).withPropertyName("kdocSources")
     outputs.dir(output).withPropertyName("sources")
 
     doLast {
-        val blocks =
-            Regex("```kotlin\\n(.*?)```", RegexOption.DOT_MATCHES_ALL)
-                .findAll(readme.asFile.readText())
+        val fence = Regex("```kotlin\\n(.*?)```", RegexOption.DOT_MATCHES_ALL)
+
+        fun blocksIn(text: String): List<String> =
+            fence
+                .findAll(text)
                 .map { it.groupValues[1].trimIndent().trimEnd() }
                 .toList()
-        // Without this, a README with no blocks would compile an empty file and the doc test would be vacuous.
-        check(blocks.isNotEmpty()) { "README.md has no ```kotlin blocks to compile" }
 
-        val imports =
-            blocks
-                .flatMap { block -> block.lineSequence().filter { it.startsWith("import ") } }
-                .distinct()
-                .sorted()
-                .joinToString("\n")
-        val snippets =
-            blocks.mapIndexed { index, block ->
-                val body =
-                    block
+        /** A KDoc body keeps the leading ` * ` on every line, so that marker is stripped before compiling. */
+        fun kdocBlocksIn(text: String): List<String> =
+            fence
+                .findAll(text)
+                .map { match ->
+                    match.groupValues[1]
                         .lineSequence()
-                        .filterNot { it.startsWith("import ") }
-                        .toList()
-                        .dropWhile { it.isBlank() }
-                        .dropLastWhile { it.isBlank() }
-                        .joinToString("\n") { line -> if (line.isBlank()) "" else "    " + line.trimEnd() }
-                "internal suspend fun readmeSnippet${index + 1}() {\n$body\n}"
-            }
+                        .joinToString("\n") { line -> line.trimStart().removePrefix("*").removePrefix(" ") }
+                        .trim()
+                }.toList()
 
-        val target = output.get().file("ReadmeSnippets.kt").asFile
-        target.parentFile.mkdirs()
-        target.writeText(
-            """
-            |// Generated from README.md's ```kotlin blocks by generateReadmeSnippets — do not edit.
-            |// Compiling this file is the doc test: a snippet that no longer matches the public API fails the build.
-            |package com.sierranevadalabs.jev.sdk.docs
-            |
-            |$imports
-            |
-            |${snippets.joinToString("\n\n")}
-            |
-            """.trimMargin(),
-        )
+        /** The blocks as compilable bodies, plus the `import` lines hoisted to the caller's file level. */
+        fun render(
+            blocks: List<String>,
+            signature: (Int) -> String,
+        ): Pair<String, String> {
+            val imports =
+                blocks
+                    .flatMap { block -> block.lineSequence().filter { it.startsWith("import ") } }
+                    .distinct()
+                    .sorted()
+                    .joinToString("\n")
+            val bodies =
+                blocks.mapIndexed { index, block ->
+                    val body =
+                        block
+                            .lineSequence()
+                            .filterNot { it.startsWith("import ") }
+                            .toList()
+                            .dropWhile { it.isBlank() }
+                            .dropLastWhile { it.isBlank() }
+                            .joinToString("\n") { line -> if (line.isBlank()) "" else "    " + line.trimEnd() }
+                    "${signature(index)} {\n$body\n}"
+                }
+            return imports to bodies.joinToString("\n\n")
+        }
+
+        fun source(
+            packageName: String,
+            origin: String,
+            imports: String,
+            bodies: String,
+        ): String {
+            val header =
+                "// Generated from $origin by generateDocSnippets — do not edit.\n" +
+                    "// Compiling this file is the doc test: a snippet that no longer matches the public API fails the build.\n" +
+                    "package $packageName"
+            return buildString {
+                append(header)
+                if (imports.isNotEmpty()) append("\n\n").append(imports)
+                if (bodies.isNotEmpty()) append("\n\n").append(bodies)
+                append("\n")
+            }
+        }
+
+        val readmeBlocks = blocksIn(readme.asFile.readText())
+        // Without this, a README with no blocks would compile an empty file and the doc test would be vacuous.
+        check(readmeBlocks.isNotEmpty()) { "README.md has no ```kotlin blocks to compile" }
+
+        val kdocBlocks =
+            sources.asFile
+                .walkTopDown()
+                .filter { it.isFile && it.extension == "kt" }
+                .sortedBy { it.invariantSeparatorsPath }
+                .flatMap { kdocBlocksIn(it.readText()) }
+                .toList()
+
+        val (readmeImports, readmeBodies) = render(readmeBlocks) { "internal suspend fun readmeSnippet${it + 1}()" }
+        val (kdocImports, kdocBodies) = render(kdocBlocks) { "internal suspend fun kdocSnippet${it + 1}(client: TypeSafeClient)" }
+
+        output.get().asFile.mkdirs()
+        output
+            .get()
+            .file("ReadmeSnippets.kt")
+            .asFile
+            .writeText(source("com.sierranevadalabs.jev.sdk.docs", "README.md's ```kotlin blocks", readmeImports, readmeBodies))
+        output
+            .get()
+            .file("KdocSnippets.kt")
+            .asFile
+            .writeText(source("com.sierranevadalabs.jev.sdk", "the ```kotlin blocks in src/**/*.kt KDoc", kdocImports, kdocBodies))
     }
 }
 
@@ -165,7 +220,7 @@ kotlin {
         }
         commonTest {
             kotlin.srcDir(generateConformanceFixtures)
-            kotlin.srcDir(generateReadmeSnippets)
+            kotlin.srcDir(generateDocSnippets)
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)

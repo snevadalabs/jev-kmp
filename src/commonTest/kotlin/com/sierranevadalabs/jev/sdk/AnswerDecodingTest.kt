@@ -123,6 +123,38 @@ class AnswerDecodingTest {
     }
 
     @Test
+    fun aKnownAnswerFieldWithTheWrongJsonTypeFailsNamingTheFieldPath() {
+        // ticket 22's `as? JsonObject` / `as? JsonPrimitive` survivors on Answers.kt: the key is right and the
+        // JSON type is not, so the answer must fail naming the exact field rather than coerce or crash later.
+        val cases =
+            mapOf(
+                """{"urgent": "not an object"}""" to "answers.urgent",
+                """{"urgent": {"type": 7, "noul": 0.5}}""" to "answers.urgent.type",
+                """{"urgent": {"type": "noul", "noul": "0.5"}}""" to "answers.urgent.noul",
+                """{"urgent": {"type": "noul", "noul": true}}""" to "answers.urgent.noul",
+                """{"category": {"type": "choice", "choice": 1, "confidence": 0.9, "probabilities": {"a": 1.0}}}""" to
+                    "answers.category.choice",
+                """{"category": {"type": "choice", "choice": "a", "confidence": 0.9, "probabilities": [1.0]}}""" to
+                    "answers.category.probabilities",
+                """{"category": {"type": "choice", "choice": "a", "confidence": "0.9", "probabilities": {"a": 1.0}}}""" to
+                    "answers.category.confidence",
+                """{"category": {"type": "choice", "choice": "a", "confidence": 0.9, "probabilities": {"a": "1.0"}}}""" to
+                    "answers.category.probabilities.a",
+                """{"category": {"type": "choice", "choice": "a", "confidence": 0.9, "probabilities": {"a": [1]}}}""" to
+                    "answers.category.probabilities.a",
+                """{"quality": {"type": "score", "score": 1.0, "confidence": 0.5, "legend": {"0": "x"}, "probabilities": {"0": true}}}""" to
+                    "answers.quality.probabilities.0",
+                """{"quality": {"type": "score", "score": 1.0, "confidence": 0.5, "legend": [1], "probabilities": {"0": 0.5}}}""" to
+                    "answers.quality.legend",
+            )
+
+        for ((answers, field) in cases) {
+            val failure = assertFailsWith<ResponseValidationException>(answers) { decode(answers) }
+            assertEquals(field, failure.fieldPath, answers)
+        }
+    }
+
+    @Test
     fun everyFixtureResponseDecodesOrFailsAtTheFieldTheFixtureNames() {
         val cases = loadConformanceCases().filter { it.id.startsWith("response-") && it.responses.last().status == 200 }
         assertTrue(cases.isNotEmpty())

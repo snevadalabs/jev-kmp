@@ -82,6 +82,10 @@ class WireTransportTest {
 
                 val systemOne = runCatching { client.systemOne("hello", noul("urgent", "?")) }.exceptionOrNull()
                 assertIs<APITimeoutError>(systemOne, "systemOne")
+                // ported from typesafe-sdk-js/test/reliability.test.ts — "retries after a timeout, each attempt
+                // getting its own timeout": the default policy retries a timeout, so a stalled body is three
+                // full attempts, not one budget shared across them.
+                assertEquals(3, server.recordedRequests.size, "the first attempt plus one per retry")
 
                 val models = runCatching { client.models.list() }.exceptionOrNull()
                 assertIs<APITimeoutError>(models, "models.list")

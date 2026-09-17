@@ -113,6 +113,9 @@ status, duration and request id alone, so there is no redaction table that can b
 
 - **A `score` question needs at least two levels.** Fewer is rejected locally with an `IllegalArgumentException`
   instead of spending a `422`; both SDKs require it on the wire.
+- **The client reports its resolved settings.** `baseUrl`, `defaultModel`, `timeout`, `retry`, `logLevel` and
+  `defaultHeaders` read back the value that actually took effect after `explicit → environment → default` — the
+  same six the JavaScript SDK exposes. The API key has no accessor, here or there.
 - **No log line can carry a header, a body or the API key.** Logging is off by default — a deliberate divergence
   from the JavaScript SDK, whose default is `warn` — and when it is enabled, `info` reports one line per call
   (method, path, status, duration, request id) and one line per retry. Nothing else is formatted at all, so no
