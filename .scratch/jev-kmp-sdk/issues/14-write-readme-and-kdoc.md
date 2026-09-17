@@ -1,7 +1,7 @@
 # Write the README and KDoc
 
 Type: task
-Status: open
+Status: claimed
 Blocked by: 12
 
 ## Question
