@@ -12,6 +12,7 @@ plugins {
     alias(libs.plugins.binary.compatibility.validator)
     alias(libs.plugins.kover)
     alias(libs.plugins.maven.publish)
+    alias(libs.plugins.pitest)
 }
 
 // `conformance/` is the cross-language fixture set, and a KMP `commonTest` cannot read files on Native. The
@@ -328,4 +329,61 @@ kover {
             }
         }
     }
+}
+
+// Mutation testing is an on-demand task, deliberately outside `check`: it re-runs the JVM suite once per mutant.
+// The `info.solidsoft.pitest` plugin registers its own task only under the `java` plugin, which a KMP module
+// never applies, so `PitestTask` is registered here against the JVM compilation's own classpath. Nothing here
+// reaches a published artifact: it is the `pitest` configuration and one verification task.
+// Read .scratch/jev-kmp-sdk/research/22-mutation-testing-evaluation.md before trusting a run.
+val jvmMainCompilation =
+    kotlin.targets
+        .getByName("jvm")
+        .compilations
+        .getByName("main")
+val jvmTestCompilation =
+    kotlin.targets
+        .getByName("jvm")
+        .compilations
+        .getByName("test")
+
+dependencies {
+    add("pitest", libs.pitest.command.line)
+}
+
+tasks.register<info.solidsoft.gradle.pitest.PitestTask>("pitestJvm") {
+    group = "verification"
+    description = "Runs PIT mutation analysis over the JVM compilation of commonMain. On demand; not in check."
+    dependsOn(jvmTestCompilation.compileTaskProvider)
+
+    targetClasses.set(setOf("com.sierranevadalabs.jev.sdk.*"))
+    targetTests.set(setOf("com.sierranevadalabs.jev.sdk.*"))
+    sourceDirs.from(
+        layout.projectDirectory.dir("src/commonMain/kotlin"),
+        layout.projectDirectory.dir("src/jvmMain/kotlin"),
+    )
+    mutators.set(setOf("STRONGER"))
+    verbosity.set("VERBOSE")
+    timestampedReports.set(false)
+    outputFormats.set(setOf("XML", "HTML"))
+    threads.set(Runtime.getRuntime().availableProcessors())
+    failWhenNoMutations.set(true)
+
+    // PIT is launched from the `pitest` configuration and analyses the classes the JVM tests already run
+    // against: the main output plus jvmTest's full runtime classpath.
+    launchClasspath.from(configurations.named("pitest"))
+    mutableCodePaths.from(jvmMainCompilation.output.classesDirs)
+    additionalClasspath.from(
+        jvmMainCompilation.output.classesDirs,
+        jvmTestCompilation.output.classesDirs,
+        jvmTestCompilation.runtimeDependencyFiles,
+    )
+    useAdditionalClasspathFile.set(true)
+    // PIT writes this file itself and does not create its parent, so it stays at the build-directory root.
+    additionalClasspathFile.set(layout.buildDirectory.file("pitClasspath"))
+    defaultFileForHistoryData.set(layout.buildDirectory.file("pitHistory.txt"))
+    reportDir.set(layout.buildDirectory.dir("reports/pitest"))
+
+    // The live tier is gated on this property; PIT's minions must see it off, never inherited from a shell.
+    childProcessJvmArgs.add("-Dtypesafe.live=false")
 }
