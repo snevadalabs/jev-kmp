@@ -1,7 +1,7 @@
 # Write the foundational ADRs
 
 Type: task
-Status: claimed
+Status: resolved
 Blocked by:
 
 ## Question
@@ -22,3 +22,20 @@ Also write `CONTEXT.md` — the glossary, and nothing else. Terms to pin down, s
 Deliverable: `docs/adr/0001..0006*.md` and `CONTEXT.md`. Keep each ADR short — the decision, the alternatives, and what would make us change our mind.
 
 ## Answer
+
+Built `docs/adr/0001`, `0002`, `0003`, `0004`, `0006` and `CONTEXT.md`. **`0005` is deliberately absent**: by this effort's ADR-numbering rule it belongs to [Settle the conformance fixture format](07-settle-conformance-fixture-format.md), which is still open.
+
+- `0001` **Neutral coordinates and package name** — the `ai.typesafe:*` and `io.github.*` alternatives, the illegal-hyphen package, and the handover cost. **Finding:** brief §2's "transferable upstream later as a Maven-only change" is accurate for the coordinates and optimistic for the package — `com.sierranevadalabs.jev.sdk` is source-visible, so a handover is Maven-only only if upstream keeps our package. Recorded in the ADR as the honest cost; the brief was not edited.
+- `0002` **Ktor behind the engine seam** — the two config parameters, the shipped default engine, engine ownership, and the caller-block-first ordering that makes `HttpRequestRetry` → `HttpTimeout` unbreakable from caller config.
+- `0003` **Suspend-only** — Python's two near-verbatim clients as the counterexample; no blocking facade, `runBlocking` documented for JVM callers.
+- `0004` **Ktor's `HttpRequestRetry` with our own delay policy** — carries all three accepted divergences from ticket 17: above-`maxRetryAfter` fallback to our backoff, OkHttp's invisible connection retries (marked `ponytail:` with the `preconfigured` upgrade path), and the attempt count not being caller-visible. Records `delayMillis(respectRetryAfterHeader = false)` as the seam that lets the JS policy drop in, and that `HttpRequestRetry.request { }` is not exposed because a partial override silently restores Ktor's defaults.
+- `0006` **Two-level score criteria** — follows JS, diverges from Python on purpose.
+- `CONTEXT.md` — the thirteen terms, each stating the docs-vs-our-API difference where one exists (`answer`/`UnknownAnswer`, question-id placement, `primitive`, `typed question key`, `System One` as an endpoint).
+
+**Evidence.** `./gradlew checkVersion ktlintCheck jvmTest apiCheck` → `BUILD SUCCESSFUL` (`jvmTest NO-SOURCE`: the repo has no `src/` yet, so the gate is green because there is nothing to test, not because tests passed). `api/jvm/jev-kmp.api` unchanged.
+
+Deliberately undone: no README link to `docs/adr/` (ticket 14 owns the README); no CHANGELOG entry (nothing a consumer of the artifact would notice); ADR `0005` (ticket 07).
+
+Later tickets must pick up: ticket 07 writes `0005`; ticket 10 has to make ADR 0004's divergences true in code, including the KDoc note about OkHttp's invisible connection retries.
+
+Shipped but unmerged: https://github.com/snevadalabs/jev-kmp/pull/1
