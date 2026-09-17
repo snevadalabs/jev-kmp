@@ -1,7 +1,7 @@
 # Write the README and KDoc
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 12
 
 ## Question
@@ -24,3 +24,64 @@ Blocked by: 12
 Deliverable: README, complete KDoc, and the doc-compilation test wired into CI.
 
 ## Answer
+
+README, the KDoc gaps, and both gates. Branch `issue-14-readme-and-kdoc`, PR
+[#8](https://github.com/snevadalabs/jev-kmp/pull/8) — shipped but unmerged; the parent session runs the gate
+and merges.
+
+**Premise: both halves were real.** `explicitApi(Strict)` forces nothing about KDoc, and `README.md` was the
+scaffold's placeholder. The KDoc pass found only **two** undocumented public declarations — `NoulAnswer.noul`
+(no `@property noul`) and the explicit `TypeSafeConfig.toString()` override — and gave the three places the
+ticket names real prose: `RetryPolicy` (what is retried, the delay formula, the `maxRetryAfter` cap as a
+deliberate divergence from Python, what OkHttp re-sends behind our back), `UnknownAnswer` (why a new variant is
+source-breaking, never patch-released), `TypeSafeConfig` (explicit → env → default, blank env unset, read once).
+
+**KDoc gate** — `build.gradle.kts:225`, reusing the Dokka run the Apple CI lane already performs, so no new
+dependency and no new task:
+
+```kotlin
+dokka {
+    dokkaSourceSets.configureEach { reportUndocumented.set(true) }
+    dokkaPublications.configureEach { failOnWarning.set(true) }
+}
+```
+
+Two facts found by falsifying, not reading. `reportUndocumented` defaults to **false** in the Dokka 2.x Gradle
+plugin — a bare `dokkaGenerate` printed nothing for the two declarations above — and `failOnWarning` is **not**
+on the `dokkaGenerate*` tasks' `AbstractDokkaTask`, so the obvious
+`tasks.withType<AbstractDokkaTask>() { failOnWarning.set(true) }` compiles and gates nothing; it lives on
+`DokkaPublication`. Falsified end to end: deleting `Models.list`'s KDoc gave `w: Undocumented: …/Models/list/#/`
+and `FAILED … Failed with warningCount=3 and errorCount=0`, exit 1. `check` now depends on `dokkaGenerate`
+(line 308), which is host-neutral: `--dry-run` shows the task graph compiles Kotlin metadata only, never an
+Apple klib.
+
+**README** mirrors the siblings (`## Quickstart` install-then-client, `## Documentation` linking
+`docs.typesafe.ai`) plus every section the ticket lists: what-this-is, install with the real coordinate, a
+quickstart asking one question of each primitive and reading typed answers, the differences section
+(suspend-only, typed question keys, Ktor `HttpRequestRetry` under our `RetryPolicy` with the `maxRetryAfter`
+cap, `score` needing two levels, no log line that can carry a header or a body), error handling with the class
+names, and the tests including the twice-gated live tier.
+
+**Executable docs** — `generateReadmeSnippets` (`build.gradle.kts:64`), wired into `commonTest` at line 167:
+extract every fenced `kotlin` block, hoist the block's imports to file level (Kotlin allows `import` only at
+file top, so a wrapped block cannot keep them), wrap it in an `internal suspend fun`, and let the ordinary test
+compilation compile it against the module. Hoisting imports is deliberate — a stale package in a README import
+line then fails the build too — and it refuses a README with no blocks, so it cannot go vacuous.
+
+It caught three real defects on the way, which is the point of it. `systemOne(String, …)` is a top-level
+**extension**, so every block needed `import com.sierranevadalabs.jev.sdk.systemOne` or a copying reader hits
+`actual type is 'String', but 'JsonElement' was expected`. The retry block's Markdown list indentation needed
+`trimIndent()` before its imports were recognised. And renaming `maxRetries` to `maxAttempts` in the README
+gives `e: …/ReadmeSnippets.kt:38:68 No parameter with name 'maxAttempts' found.`
+
+**Gate.** `ANDROID_HOME=~/Library/Android/sdk ./gradlew check` → `BUILD SUCCESSFUL in 35s`, 69 tasks, running
+`jvmTest`, `iosSimulatorArm64Test`, `macosArm64Test`, `testAndroidHostTest`, `apiCheck`, `checkVersion`,
+`checkJvmBytecode`, `koverVerify` and `dokkaGenerate`. No Apple test failed on simulator contention.
+
+**Not done.** No CHANGELOG line: docs and build gates only, nothing a consumer of the artifact notices. No
+`apiDump`: KDoc is not public API. No logging switch: the README states 0.1.0 has none rather than documenting
+an option that does not exist — `createTransport` has a `log` seam `createClient` never fills and
+`TYPESAFE_LOG_LEVEL` (brief §9) is unread, which is still open fog on the map.
+
+**Handoff.** If a per-call log line and the `TYPESAFE_LOG_LEVEL` gate are built, the README's logging bullet
+and `TypeSafeConfig`'s KDoc must change with them.

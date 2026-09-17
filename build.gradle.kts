@@ -56,6 +56,62 @@ val generateConformanceFixtures by tasks.registering {
     }
 }
 
+// The README's fenced ```kotlin blocks are compiled, so a snippet that no longer matches the public API breaks
+// the build instead of the reader. This is what Python's doc tests do with Sybil and what the JS repo lacks.
+// Each block must therefore be self-contained and must carry the imports a reader would copy. Kotlin allows
+// `import` only at file level, so the imports are hoisted to the top of the generated file — which also makes a
+// stale package or class name in a README import line a compile error.
+val generateReadmeSnippets by tasks.registering {
+    val readme = layout.projectDirectory.file("README.md")
+    val output = layout.buildDirectory.dir("generated/readme/kotlin")
+    inputs.file(readme).withPropertyName("readme")
+    outputs.dir(output).withPropertyName("sources")
+
+    doLast {
+        val blocks =
+            Regex("```kotlin\\n(.*?)```", RegexOption.DOT_MATCHES_ALL)
+                .findAll(readme.asFile.readText())
+                .map { it.groupValues[1].trimIndent().trimEnd() }
+                .toList()
+        // Without this, a README with no blocks would compile an empty file and the doc test would be vacuous.
+        check(blocks.isNotEmpty()) { "README.md has no ```kotlin blocks to compile" }
+
+        val imports =
+            blocks
+                .flatMap { block -> block.lineSequence().filter { it.startsWith("import ") } }
+                .distinct()
+                .sorted()
+                .joinToString("\n")
+        val snippets =
+            blocks.mapIndexed { index, block ->
+                val body =
+                    block
+                        .lineSequence()
+                        .filterNot { it.startsWith("import ") }
+                        .toList()
+                        .dropWhile { it.isBlank() }
+                        .dropLastWhile { it.isBlank() }
+                        .joinToString("\n") { line -> if (line.isBlank()) "" else "    " + line.trimEnd() }
+                "internal suspend fun readmeSnippet${index + 1}() {\n$body\n}"
+            }
+
+        val target = output.get().file("ReadmeSnippets.kt").asFile
+        target.parentFile.mkdirs()
+        target.writeText(
+            """
+            |// Generated from README.md's ```kotlin blocks by generateReadmeSnippets — do not edit.
+            |// Compiling this file is the doc test: a snippet that no longer matches the public API fails the build.
+            |package com.sierranevadalabs.jev.sdk.docs
+            |
+            |$imports
+            |
+            |${snippets.joinToString("\n\n")}
+            |
+            """.trimMargin(),
+        )
+    }
+}
+
 kotlin {
     // AGP 9 requires com.android.kotlin.multiplatform.library; androidTarget() is going away. Host (unit)
     // tests are off by default in this plugin and must be opted into, or commonTest never runs on Android.
@@ -108,6 +164,7 @@ kotlin {
         }
         commonTest {
             kotlin.srcDir(generateConformanceFixtures)
+            kotlin.srcDir(generateReadmeSnippets)
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
@@ -156,6 +213,21 @@ mavenPublishing {
             connection = "scm:git:git://github.com/snevadalabs/jev-kmp.git"
             developerConnection = "scm:git:ssh://git@github.com/snevadalabs/jev-kmp.git"
         }
+    }
+}
+
+// `explicitApi(ExplicitApiMode.Strict)` does **not** require KDoc: an undocumented public declaration compiles
+// clean, which the typed-question prototype measured by deleting a doc comment. Dokka is the gate that does
+// catch it. `reportUndocumented` logs `Undocumented: <signature>` once per declaration Dokka would publish
+// undocumented, and the publication's `failOnWarning` turns any Dokka warning into a build failure. It reuses
+// the Dokka run the Apple CI lane already performs, so it needs no new dependency and no new task, and the
+// warning list is the work list. Do not turn either flag off to make a build pass.
+dokka {
+    dokkaSourceSets.configureEach {
+        reportUndocumented.set(true)
+    }
+    dokkaPublications.configureEach {
+        failOnWarning.set(true)
     }
 }
 
@@ -231,8 +303,9 @@ val checkJvmBytecode by tasks.registering {
 }
 
 tasks.named("check") {
-    // The coverage floor is part of the gate, not a report someone remembers to open.
-    dependsOn(checkVersion, checkJvmBytecode, "koverVerify")
+    // The coverage floor and the KDoc gate are part of the check, not reports someone remembers to open.
+    // `dokkaGenerate` is host-neutral here: it compiles Kotlin metadata only, never an Apple klib.
+    dependsOn(checkVersion, checkJvmBytecode, "koverVerify", "dokkaGenerate")
 }
 
 // The live tier is opt-in through this property; a default `check` can never reach the network or spend money.
