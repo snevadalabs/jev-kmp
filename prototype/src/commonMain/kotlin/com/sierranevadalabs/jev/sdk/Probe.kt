@@ -79,9 +79,11 @@ public object Probe {
         client.systemOne("plain", choice("c", structured, mapOf("x" to JsonPrimitive(1))))
         client.systemOne("plain", score("s", structured, listOf(JsonPrimitive(1), JsonPrimitive(2))))
 
-        // `emptyMap()` and `emptyList()` are the exception: they are a subtype of *both* overloads'
-        // parameter types, so the compiler reports an overload resolution ambiguity and the caller has to
-        // write the value type out. Verbatim error is in the ticket's Answer.
+        // `emptyMap()` and `emptyList()` are *not* ambiguous here, which is the surprising part: the
+        // `prompt` argument alone selects the overload, so the container never has to be inferred against
+        // two candidates at once. The one form that does not resolve is a plain prompt with structured
+        // options — `choice("c", "Pick", mapOf("x" to JsonPrimitive(1)))` — which reports
+        // `None of the following candidates is applicable:` and nothing more. Verbatim in the ticket.
     }
 
     /** Question 1: the same questions through a `List<Question<*>>`, which needs a spread. */
