@@ -1,7 +1,7 @@
 # Settle the conformance fixture format
 
 Type: prototype
-Status: open
+Status: claimed
 Blocked by:
 
 ## Question
