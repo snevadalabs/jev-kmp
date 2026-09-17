@@ -1,0 +1,312 @@
+public abstract interface class com/sierranevadalabs/jev/sdk/Answer {
+}
+
+public final class com/sierranevadalabs/jev/sdk/AnswerTypeMismatchException : java/lang/ClassCastException {
+	public fun <init> (Ljava/lang/String;)V
+}
+
+public final class com/sierranevadalabs/jev/sdk/ChoiceAnswer : com/sierranevadalabs/jev/sdk/Answer {
+	public fun <init> (Ljava/lang/String;Ljava/util/Map;D)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/Map;
+	public final fun component3 ()D
+	public final fun copy (Ljava/lang/String;Ljava/util/Map;D)Lcom/sierranevadalabs/jev/sdk/ChoiceAnswer;
+	public static synthetic fun copy$default (Lcom/sierranevadalabs/jev/sdk/ChoiceAnswer;Ljava/lang/String;Ljava/util/Map;DILjava/lang/Object;)Lcom/sierranevadalabs/jev/sdk/ChoiceAnswer;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getChoice ()Ljava/lang/String;
+	public final fun getConfidence ()D
+	public final fun getProbabilities ()Ljava/util/Map;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/sierranevadalabs/jev/sdk/ChoiceQuestion : com/sierranevadalabs/jev/sdk/Question {
+	public fun <init> (Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/util/Map;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lkotlinx/serialization/json/JsonElement;
+	public final fun component3 ()Ljava/util/Map;
+	public final fun copy (Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/util/Map;)Lcom/sierranevadalabs/jev/sdk/ChoiceQuestion;
+	public static synthetic fun copy$default (Lcom/sierranevadalabs/jev/sdk/ChoiceQuestion;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/util/Map;ILjava/lang/Object;)Lcom/sierranevadalabs/jev/sdk/ChoiceQuestion;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getId ()Ljava/lang/String;
+	public final fun getOptions ()Ljava/util/Map;
+	public fun getPrompt ()Lkotlinx/serialization/json/JsonElement;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/sierranevadalabs/jev/sdk/ClientKt {
+	public static final fun TypeSafeClient (Lcom/sierranevadalabs/jev/sdk/TypeSafeConfig;)Lcom/sierranevadalabs/jev/sdk/TypeSafeClient;
+	public static final fun systemOne-Zzr-CC0 (Lcom/sierranevadalabs/jev/sdk/TypeSafeClient;Ljava/lang/String;[Lcom/sierranevadalabs/jev/sdk/Question;Ljava/lang/String;Lkotlin/time/Duration;Lcom/sierranevadalabs/jev/sdk/RetryPolicy;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun systemOne-Zzr-CC0$default (Lcom/sierranevadalabs/jev/sdk/TypeSafeClient;Ljava/lang/String;[Lcom/sierranevadalabs/jev/sdk/Question;Ljava/lang/String;Lkotlin/time/Duration;Lcom/sierranevadalabs/jev/sdk/RetryPolicy;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class com/sierranevadalabs/jev/sdk/HeadersKt {
+	public static final field SDK_VERSION Ljava/lang/String;
+}
+
+public final class com/sierranevadalabs/jev/sdk/LogLevel : java/lang/Enum {
+	public static final field Debug Lcom/sierranevadalabs/jev/sdk/LogLevel;
+	public static final field Error Lcom/sierranevadalabs/jev/sdk/LogLevel;
+	public static final field Info Lcom/sierranevadalabs/jev/sdk/LogLevel;
+	public static final field Off Lcom/sierranevadalabs/jev/sdk/LogLevel;
+	public static final field Warn Lcom/sierranevadalabs/jev/sdk/LogLevel;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/sierranevadalabs/jev/sdk/LogLevel;
+	public static fun values ()[Lcom/sierranevadalabs/jev/sdk/LogLevel;
+}
+
+public final class com/sierranevadalabs/jev/sdk/ModelCard {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/sierranevadalabs/jev/sdk/ModelCard;
+	public static synthetic fun copy$default (Lcom/sierranevadalabs/jev/sdk/ModelCard;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/sierranevadalabs/jev/sdk/ModelCard;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getReleaseDate ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/sierranevadalabs/jev/sdk/Models {
+	public abstract fun list-k1IrOU0 (Lkotlin/time/Duration;Lcom/sierranevadalabs/jev/sdk/RetryPolicy;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/sierranevadalabs/jev/sdk/Models$DefaultImpls {
+	public static synthetic fun list-k1IrOU0$default (Lcom/sierranevadalabs/jev/sdk/Models;Lkotlin/time/Duration;Lcom/sierranevadalabs/jev/sdk/RetryPolicy;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class com/sierranevadalabs/jev/sdk/NoulAnswer : com/sierranevadalabs/jev/sdk/Answer {
+	public fun <init> (D)V
+	public final fun component1 ()D
+	public final fun copy (D)Lcom/sierranevadalabs/jev/sdk/NoulAnswer;
+	public static synthetic fun copy$default (Lcom/sierranevadalabs/jev/sdk/NoulAnswer;DILjava/lang/Object;)Lcom/sierranevadalabs/jev/sdk/NoulAnswer;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getNoul ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/sierranevadalabs/jev/sdk/NoulCriteria {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;)V
+	public final fun component1 ()Lkotlinx/serialization/json/JsonElement;
+	public final fun component2 ()Lkotlinx/serialization/json/JsonElement;
+	public final fun copy (Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;)Lcom/sierranevadalabs/jev/sdk/NoulCriteria;
+	public static synthetic fun copy$default (Lcom/sierranevadalabs/jev/sdk/NoulCriteria;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;ILjava/lang/Object;)Lcom/sierranevadalabs/jev/sdk/NoulCriteria;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getIfFalse ()Lkotlinx/serialization/json/JsonElement;
+	public final fun getIfTrue ()Lkotlinx/serialization/json/JsonElement;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/sierranevadalabs/jev/sdk/NoulQuestion : com/sierranevadalabs/jev/sdk/Question {
+	public fun <init> (Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Lcom/sierranevadalabs/jev/sdk/NoulCriteria;)V
+	public synthetic fun <init> (Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Lcom/sierranevadalabs/jev/sdk/NoulCriteria;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lkotlinx/serialization/json/JsonElement;
+	public final fun component3 ()Lcom/sierranevadalabs/jev/sdk/NoulCriteria;
+	public final fun copy (Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Lcom/sierranevadalabs/jev/sdk/NoulCriteria;)Lcom/sierranevadalabs/jev/sdk/NoulQuestion;
+	public static synthetic fun copy$default (Lcom/sierranevadalabs/jev/sdk/NoulQuestion;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Lcom/sierranevadalabs/jev/sdk/NoulCriteria;ILjava/lang/Object;)Lcom/sierranevadalabs/jev/sdk/NoulQuestion;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCriteria ()Lcom/sierranevadalabs/jev/sdk/NoulCriteria;
+	public fun getId ()Ljava/lang/String;
+	public fun getPrompt ()Lkotlinx/serialization/json/JsonElement;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/sierranevadalabs/jev/sdk/Question {
+	public abstract fun getId ()Ljava/lang/String;
+	public abstract fun getPrompt ()Lkotlinx/serialization/json/JsonElement;
+}
+
+public final class com/sierranevadalabs/jev/sdk/QuestionsKt {
+	public static final fun choice (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;)Lcom/sierranevadalabs/jev/sdk/ChoiceQuestion;
+	public static final fun choice (Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/util/Map;)Lcom/sierranevadalabs/jev/sdk/ChoiceQuestion;
+	public static final fun noul (Ljava/lang/String;Ljava/lang/String;Lcom/sierranevadalabs/jev/sdk/NoulCriteria;)Lcom/sierranevadalabs/jev/sdk/NoulQuestion;
+	public static final fun noul (Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Lcom/sierranevadalabs/jev/sdk/NoulCriteria;)Lcom/sierranevadalabs/jev/sdk/NoulQuestion;
+	public static synthetic fun noul$default (Ljava/lang/String;Ljava/lang/String;Lcom/sierranevadalabs/jev/sdk/NoulCriteria;ILjava/lang/Object;)Lcom/sierranevadalabs/jev/sdk/NoulQuestion;
+	public static synthetic fun noul$default (Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Lcom/sierranevadalabs/jev/sdk/NoulCriteria;ILjava/lang/Object;)Lcom/sierranevadalabs/jev/sdk/NoulQuestion;
+	public static final fun score (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)Lcom/sierranevadalabs/jev/sdk/ScoreQuestion;
+	public static final fun score (Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/util/List;)Lcom/sierranevadalabs/jev/sdk/ScoreQuestion;
+}
+
+public final class com/sierranevadalabs/jev/sdk/RetryPolicy {
+	public synthetic fun <init> (JJJDILjava/util/Set;ZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JJJDILjava/util/Set;ZZZLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-UwyO8pc ()J
+	public final fun component2-UwyO8pc ()J
+	public final fun component3-UwyO8pc ()J
+	public final fun component4 ()D
+	public final fun component5 ()I
+	public final fun component6 ()Ljava/util/Set;
+	public final fun component7 ()Z
+	public final fun component8 ()Z
+	public final fun component9 ()Z
+	public final fun copy-hTMF5Xc (JJJDILjava/util/Set;ZZZ)Lcom/sierranevadalabs/jev/sdk/RetryPolicy;
+	public static synthetic fun copy-hTMF5Xc$default (Lcom/sierranevadalabs/jev/sdk/RetryPolicy;JJJDILjava/util/Set;ZZZILjava/lang/Object;)Lcom/sierranevadalabs/jev/sdk/RetryPolicy;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getApiConnectionError ()Z
+	public final fun getApiTimeoutError ()Z
+	public final fun getBackoffInitial-UwyO8pc ()J
+	public final fun getBackoffJitter ()D
+	public final fun getBackoffMax-UwyO8pc ()J
+	public final fun getHttpStatuses ()Ljava/util/Set;
+	public final fun getMaxRetries ()I
+	public final fun getMaxRetryAfter-UwyO8pc ()J
+	public final fun getRespectRetryAfter ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/sierranevadalabs/jev/sdk/ScoreAnswer : com/sierranevadalabs/jev/sdk/Answer {
+	public fun <init> (DLjava/util/Map;Ljava/util/Map;D)V
+	public final fun component1 ()D
+	public final fun component2 ()Ljava/util/Map;
+	public final fun component3 ()Ljava/util/Map;
+	public final fun component4 ()D
+	public final fun copy (DLjava/util/Map;Ljava/util/Map;D)Lcom/sierranevadalabs/jev/sdk/ScoreAnswer;
+	public static synthetic fun copy$default (Lcom/sierranevadalabs/jev/sdk/ScoreAnswer;DLjava/util/Map;Ljava/util/Map;DILjava/lang/Object;)Lcom/sierranevadalabs/jev/sdk/ScoreAnswer;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getConfidence ()D
+	public final fun getLegend ()Ljava/util/Map;
+	public final fun getProbabilities ()Ljava/util/Map;
+	public final fun getScore ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/sierranevadalabs/jev/sdk/ScoreQuestion : com/sierranevadalabs/jev/sdk/Question {
+	public fun <init> (Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/util/List;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lkotlinx/serialization/json/JsonElement;
+	public final fun component3 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/util/List;)Lcom/sierranevadalabs/jev/sdk/ScoreQuestion;
+	public static synthetic fun copy$default (Lcom/sierranevadalabs/jev/sdk/ScoreQuestion;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/util/List;ILjava/lang/Object;)Lcom/sierranevadalabs/jev/sdk/ScoreQuestion;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getId ()Ljava/lang/String;
+	public final fun getLevels ()Ljava/util/List;
+	public fun getPrompt ()Lkotlinx/serialization/json/JsonElement;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/sierranevadalabs/jev/sdk/SystemOneResponse {
+	public fun <init> (Ljava/util/Map;Ljava/lang/String;Lcom/sierranevadalabs/jev/sdk/Usage;Ljava/lang/String;ILjava/util/Map;)V
+	public synthetic fun <init> (Ljava/util/Map;Ljava/lang/String;Lcom/sierranevadalabs/jev/sdk/Usage;Ljava/lang/String;ILjava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun answerOrNull (Lcom/sierranevadalabs/jev/sdk/Question;)Lcom/sierranevadalabs/jev/sdk/Answer;
+	public final fun get (Lcom/sierranevadalabs/jev/sdk/Question;)Lcom/sierranevadalabs/jev/sdk/Answer;
+	public final fun getAnswers ()Ljava/util/Map;
+	public final fun getHeaders ()Ljava/util/Map;
+	public final fun getModel ()Ljava/lang/String;
+	public final fun getRequestId ()Ljava/lang/String;
+	public final fun getStatus ()I
+	public final fun getUsage ()Lcom/sierranevadalabs/jev/sdk/Usage;
+}
+
+public abstract interface class com/sierranevadalabs/jev/sdk/TypeSafeClient : java/lang/AutoCloseable {
+	public abstract fun getBaseUrl ()Ljava/lang/String;
+	public abstract fun getDefaultHeaders ()Ljava/util/Map;
+	public abstract fun getDefaultModel ()Ljava/lang/String;
+	public abstract fun getLogLevel ()Lcom/sierranevadalabs/jev/sdk/LogLevel;
+	public abstract fun getModels ()Lcom/sierranevadalabs/jev/sdk/Models;
+	public abstract fun getRetry ()Lcom/sierranevadalabs/jev/sdk/RetryPolicy;
+	public abstract fun getTimeout-UwyO8pc ()J
+	public abstract fun systemOne-FHKeTTw (Lkotlinx/serialization/json/JsonElement;[Lcom/sierranevadalabs/jev/sdk/Question;Ljava/lang/String;Lkotlin/time/Duration;Lcom/sierranevadalabs/jev/sdk/RetryPolicy;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/sierranevadalabs/jev/sdk/TypeSafeClient$DefaultImpls {
+	public static synthetic fun systemOne-FHKeTTw$default (Lcom/sierranevadalabs/jev/sdk/TypeSafeClient;Lkotlinx/serialization/json/JsonElement;[Lcom/sierranevadalabs/jev/sdk/Question;Ljava/lang/String;Lkotlin/time/Duration;Lcom/sierranevadalabs/jev/sdk/RetryPolicy;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class com/sierranevadalabs/jev/sdk/TypeSafeConfig {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Duration;Ljava/util/Map;Lcom/sierranevadalabs/jev/sdk/RetryPolicy;Lcom/sierranevadalabs/jev/sdk/LogLevel;Lio/ktor/client/engine/HttpClientEngine;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Duration;Ljava/util/Map;Lcom/sierranevadalabs/jev/sdk/RetryPolicy;Lcom/sierranevadalabs/jev/sdk/LogLevel;Lio/ktor/client/engine/HttpClientEngine;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getApiKey ()Ljava/lang/String;
+	public final fun getBaseUrl ()Ljava/lang/String;
+	public final fun getDefaultHeaders ()Ljava/util/Map;
+	public final fun getDefaultModel ()Ljava/lang/String;
+	public final fun getEngine ()Lio/ktor/client/engine/HttpClientEngine;
+	public final fun getHttpClientConfig ()Lkotlin/jvm/functions/Function1;
+	public final fun getLogLevel ()Lcom/sierranevadalabs/jev/sdk/LogLevel;
+	public final fun getRetry ()Lcom/sierranevadalabs/jev/sdk/RetryPolicy;
+	public final fun getTimeout-FghU774 ()Lkotlin/time/Duration;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/sierranevadalabs/jev/sdk/UnknownAnswer : com/sierranevadalabs/jev/sdk/Answer {
+	public fun <init> (Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lkotlinx/serialization/json/JsonElement;
+	public final fun copy (Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;)Lcom/sierranevadalabs/jev/sdk/UnknownAnswer;
+	public static synthetic fun copy$default (Lcom/sierranevadalabs/jev/sdk/UnknownAnswer;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;ILjava/lang/Object;)Lcom/sierranevadalabs/jev/sdk/UnknownAnswer;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRaw ()Lkotlinx/serialization/json/JsonElement;
+	public final fun getType ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/sierranevadalabs/jev/sdk/Usage {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/Integer;Ljava/lang/Integer;)V
+	public synthetic fun <init> (Ljava/lang/Integer;Ljava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/Integer;
+	public final fun component2 ()Ljava/lang/Integer;
+	public final fun copy (Ljava/lang/Integer;Ljava/lang/Integer;)Lcom/sierranevadalabs/jev/sdk/Usage;
+	public static synthetic fun copy$default (Lcom/sierranevadalabs/jev/sdk/Usage;Ljava/lang/Integer;Ljava/lang/Integer;ILjava/lang/Object;)Lcom/sierranevadalabs/jev/sdk/Usage;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getInputTokens ()Ljava/lang/Integer;
+	public final fun getOutputTokens ()Ljava/lang/Integer;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public class com/sierranevadalabs/jev/sdk/errors/APIConnectionError : com/sierranevadalabs/jev/sdk/errors/JevError {
+}
+
+public class com/sierranevadalabs/jev/sdk/errors/APIError : com/sierranevadalabs/jev/sdk/errors/JevError {
+	public final fun getBody ()Lkotlinx/serialization/json/JsonElement;
+	public final fun getRequestId ()Ljava/lang/String;
+	public final fun getStatus ()I
+}
+
+public final class com/sierranevadalabs/jev/sdk/errors/APIResponseValidationError : com/sierranevadalabs/jev/sdk/errors/APIError {
+	public final fun getField ()Ljava/lang/String;
+}
+
+public final class com/sierranevadalabs/jev/sdk/errors/APITimeoutError : com/sierranevadalabs/jev/sdk/errors/APIConnectionError {
+}
+
+public final class com/sierranevadalabs/jev/sdk/errors/AuthenticationError : com/sierranevadalabs/jev/sdk/errors/APIError {
+}
+
+public final class com/sierranevadalabs/jev/sdk/errors/BadRequestError : com/sierranevadalabs/jev/sdk/errors/APIError {
+}
+
+public final class com/sierranevadalabs/jev/sdk/errors/InternalServerError : com/sierranevadalabs/jev/sdk/errors/APIError {
+}
+
+public class com/sierranevadalabs/jev/sdk/errors/JevError : java/lang/Exception {
+}
+
+public final class com/sierranevadalabs/jev/sdk/errors/NotFoundError : com/sierranevadalabs/jev/sdk/errors/APIError {
+}
+
+public final class com/sierranevadalabs/jev/sdk/errors/PermissionDeniedError : com/sierranevadalabs/jev/sdk/errors/APIError {
+}
+
+public final class com/sierranevadalabs/jev/sdk/errors/RateLimitError : com/sierranevadalabs/jev/sdk/errors/APIError {
+	public final fun getRetryAfterMs ()Ljava/lang/Long;
+}
+
+public final class com/sierranevadalabs/jev/sdk/errors/UnprocessableEntityError : com/sierranevadalabs/jev/sdk/errors/APIError {
+}
+

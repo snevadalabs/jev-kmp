@@ -1,0 +1,58 @@
+name: check
+
+# Disabled while the org's GitHub Actions billing is blocked (private repo on a free plan, macOS minutes
+# exhausted) — jobs fail in 9s without starting. Nothing runs until billing is restored; the gate is
+# `./gradlew check` locally in the meantime. To restore, put back the two original triggers:
+#   on:
+#     push:
+#       branches: [main]
+#     pull_request:
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # The Linux lane: the primary JVM host, plus the one Native target that can only be executed here.
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: "platforms;android-36"
+      - uses: gradle/actions/setup-gradle@v6
+      - run: ./gradlew ktlintCheck checkVersion checkJvmBytecode koverVerify jvmTest linuxX64Test
+
+  # The Apple lane, and the only host that can build every declared target — so the API dump comparison and
+  # Dokka live here. iosSimulatorArm64Test is the Apple test that actually executes on an arm64 runner;
+  # iosX64Test silently no-ops there, and device targets are compile-only on hosted runners.
+  apple:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: "platforms;android-36"
+      - uses: gradle/actions/setup-gradle@v6
+      - run: ./gradlew apiCheck iosSimulatorArm64Test macosArm64Test dokkaGenerate
+      # The gate is the dokkaGenerate task above failing; this only delivers the result. It stays tolerant of
+      # an empty output until the public API exists to document.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dokka-html
+          path: build/dokka/html
+          if-no-files-found: ignore

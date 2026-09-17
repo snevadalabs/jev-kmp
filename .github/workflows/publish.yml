@@ -1,0 +1,53 @@
+name: publish
+
+# Tag-driven, and only tag-driven: no pull_request path reaches this workflow, so the publishing secrets can
+# never be exposed to a fork. The Apple targets it must build mean it runs on macOS.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: "platforms;android-36"
+      - uses: gradle/actions/setup-gradle@v6
+
+      # Refuse to publish a version the changelog does not describe.
+      - run: ./gradlew checkVersion
+
+      # The release-time mutation run, and deliberately non-gating: mutation testing has no threshold that
+      # means anything at this size (one mutant is 0.14pp, repeat runs flip 0.8%), and a release must not fail
+      # on a measurement. A tag push (or a manual dispatch) is the only moment anyone releases, so the test
+      # strength it prints and the survivor count (from build/reports/pitest/mutations.xml) land in the run's
+      # output either way, and the report is uploaded as an artifact.
+      - run: ./gradlew pitestJvm
+        continue-on-error: true
+        timeout-minutes: 20
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: pitest
+          path: build/reports/pitest
+          if-no-files-found: ignore
+
+      # Signing and the namespace verification are one-time human prerequisites; this workflow is the shape,
+      # and it is expected to fail until those exist.
+      - run: ./gradlew publishToMavenCentral
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_KEY_CONTENTS }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_KEY_ID }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
