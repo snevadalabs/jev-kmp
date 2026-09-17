@@ -21,6 +21,8 @@ dokka = "2.2.0"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+# The `runTest` test-runner only. `kotlin.test` ships no coroutine runner, and `runBlocking` is not in the
+# common source set of `kotlinx-coroutines-core`, so commonTest needs this to launch a suspend call at all.
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }

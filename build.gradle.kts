@@ -97,6 +97,10 @@ kotlin {
     }
 
     sourceSets {
+        commonMain.dependencies {
+            implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.ktor.client.core)
+        }
         commonTest {
             kotlin.srcDir(generateConformanceFixtures)
             dependencies {
@@ -107,6 +111,12 @@ kotlin {
                 implementation(libs.ktor.client.mock)
             }
         }
+        // The default engines, so a caller configures nothing. Ktor publishes all four as plain JVM JARs for
+        // Android as well as the JVM, which is why androidMain can reuse the OkHttp artifact.
+        jvmMain.dependencies { implementation(libs.ktor.client.okhttp) }
+        androidMain.dependencies { implementation(libs.ktor.client.okhttp) }
+        appleMain.dependencies { implementation(libs.ktor.client.darwin) }
+        linuxMain.dependencies { implementation(libs.ktor.client.cio) }
     }
 }
 
@@ -155,8 +165,10 @@ val checkVersion by tasks.registering {
     description = "Asserts the gradle.properties version matches the top CHANGELOG.md heading."
 
     val changelog = layout.projectDirectory.file("CHANGELOG.md")
+    val sources = layout.projectDirectory.dir("src")
     val declaredVersion = version.toString()
     inputs.file(changelog)
+    inputs.dir(sources)
     inputs.property("version", declaredVersion)
 
     doLast {
@@ -173,9 +185,50 @@ val checkVersion by tasks.registering {
                 "version $declaredVersion does not match CHANGELOG.md's top heading '$top'"
             }
         }
+
+        // The wire header `X-TypeSafe-SDK` carries a version, and a Kotlin constant cannot read
+        // gradle.properties. Assert the two agree rather than letting them drift.
+        val expected = declaredVersion.removeSuffix("-SNAPSHOT")
+        val declaredInSource =
+            sources.asFile
+                .walkTopDown()
+                .filter { it.extension == "kt" }
+                .mapNotNull { file ->
+                    Regex("SDK_VERSION\\s*=\\s*\"([^\"]+)\"").find(file.readText())?.groupValues?.get(1)
+                }.toList()
+        check(declaredInSource == listOf(expected)) {
+            "SDK_VERSION in src/ is $declaredInSource, expected [$expected] from gradle.properties"
+        }
+    }
+}
+
+// Java 8 bytecode is the level the pinned toolchain promises consumers, and `jvmTarget` alone does not prove it.
+// The class file's major version does: 52 is Java 8.
+val checkJvmBytecode by tasks.registering {
+    group = "verification"
+    description = "Asserts the compiled JVM classes are Java 8 (class file major version 52)."
+
+    val classesDir = layout.buildDirectory.dir("classes/kotlin/jvm/main")
+    dependsOn("compileKotlinJvm")
+    inputs.dir(classesDir)
+
+    doLast {
+        val classes =
+            classesDir
+                .get()
+                .asFile
+                .walkTopDown()
+                .filter { it.extension == "class" }
+                .toList()
+        check(classes.isNotEmpty()) { "no compiled JVM classes under $classesDir" }
+        for (classFile in classes) {
+            val bytes = classFile.readBytes()
+            val major = (bytes[6].toInt() and 0xFF shl 8) or (bytes[7].toInt() and 0xFF)
+            check(major == 52) { "$classFile is class file major version $major, expected 52 (Java 8)" }
+        }
     }
 }
 
 tasks.named("check") {
-    dependsOn(checkVersion)
+    dependsOn(checkVersion, checkJvmBytecode)
 }
