@@ -1,7 +1,7 @@
 # Implement transport and retry
 
 Type: task
-Status: open
+Status: claimed
 Blocked by: 09, 17
 
 ## Question
