@@ -13,9 +13,12 @@ written JSON cases are the mechanism; this file is the format those three suites
 by a foreign loader with no schema engine and no Kotlin, and it has to be strong enough that a case can state a
 request body, a scripted response, and the outcome the SDK must reach.
 
-The fixture set is a proof set, not a test suite: 15 cases is the cap. Fixture sets rot when they grow past what
+The fixture set is a proof set, not a test suite: 16 cases is the cap. Fixture sets rot when they grow past what
 anyone reads, so a case earns its place only by pinning a wire behaviour that a foreign SDK could plausibly get
-wrong.
+wrong. **[amended by *Close the three parity gaps a sibling audit turned up*]** The sixteenth is noul criteria:
+both siblings send `criteria: {"true"?, "false"?}` and this SDK could not express it at all, which is the exact
+kind of wire behaviour the sentence above admits — the first fifteen were written from the same recon that missed
+the field.
 
 ## Decision
 
