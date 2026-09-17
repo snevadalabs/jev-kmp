@@ -1,7 +1,7 @@
 # Write the foundational ADRs
 
 Type: task
-Status: open
+Status: claimed
 Blocked by:
 
 ## Question
