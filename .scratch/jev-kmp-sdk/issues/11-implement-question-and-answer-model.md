@@ -26,8 +26,9 @@ Deliverable: question and answer sources, the field-path validation helper, and 
 
 ## Answer
 
-**Built, gated, green.** Branch `issue-11-implement-question-answer-model`. No question to report: every open
-point was already settled by the brief, an ADR, or ticket 06's `## Answer`.
+**Built, gated, green.** Branch `issue-11-implement-question-answer-model`, shipped unmerged as
+[PR #5](https://github.com/snevadalabs/jev-kmp/pull/5). No question to report: every open point was already
+settled by the brief, an ADR, or ticket 06's `## Answer`.
 
 ### What landed
 
