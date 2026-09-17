@@ -23,10 +23,10 @@ internal val DEFAULT_TIMEOUT: Duration = 10.seconds
  * Every value is resolved when the client is built ([TypeSafeClient]), so leaving a field `null` means "read
  * the environment, then use the SDK's default". Precedence is always explicit → environment → SDK default:
  * [apiKey] reads `TYPESAFE_API_KEY` and has no default, [baseUrl] reads `TYPESAFE_BASE_URL` before
- * `https://api.typesafe.ai`, [defaultModel] reads `TYPESAFE_DEFAULT_MODEL` before `jev-latest`, and [timeout]
- * has no environment variable and defaults to 10 seconds. A blank or whitespace-only environment value counts
- * as unset. The environment is read once, at construction; changing a variable later does not affect a client
- * that already exists.
+ * `https://api.typesafe.ai`, [defaultModel] reads `TYPESAFE_DEFAULT_MODEL` before `jev-latest`, [logLevel]
+ * reads `TYPESAFE_LOG_LEVEL` before [LogLevel.Off], and [timeout] has no environment variable and defaults to
+ * 10 seconds. A blank or whitespace-only environment value counts as unset. The environment is read once, at
+ * construction; changing a variable later does not affect a client that already exists.
  *
  * @property apiKey the API key. `null` falls back to `TYPESAFE_API_KEY`; there is no default.
  * @property baseUrl the API root. `null` falls back to `TYPESAFE_BASE_URL`, then `https://api.typesafe.ai`.
@@ -36,6 +36,8 @@ internal val DEFAULT_TIMEOUT: Duration = 10.seconds
  * @property defaultHeaders headers added to every request, before the caller's per-call headers and before
  *   the headers the SDK owns.
  * @property retry the default retry policy. A call may override it.
+ * @property logLevel how much the SDK logs. `null` falls back to `TYPESAFE_LOG_LEVEL`, then [LogLevel.Off]; see
+ *   [LogLevel] for what each level emits.
  * @property engine the HTTP engine to use. `null` creates the platform default (OkHttp on JVM and Android,
  *   Darwin on Apple, CIO on Linux), which the client then owns and closes.
  * @property httpClientConfig extra Ktor client configuration. Runs before the SDK installs its own plugins,
@@ -48,6 +50,7 @@ public class TypeSafeConfig(
     public val timeout: Duration? = null,
     public val defaultHeaders: Map<String, String> = emptyMap(),
     public val retry: RetryPolicy = RetryPolicy(),
+    public val logLevel: LogLevel? = null,
     public val engine: HttpClientEngine? = null,
     public val httpClientConfig: HttpClientConfig<*>.() -> Unit = {},
 ) {
@@ -69,6 +72,7 @@ internal class ResolvedConfig(
     val baseUrl: String = resolveSetting(config.baseUrl, BASE_URL_ENV, DEFAULT_BASE_URL, env)
     val defaultModel: String = resolveSetting(config.defaultModel, DEFAULT_MODEL_ENV, DEFAULT_MODEL, env)
     val timeout: Duration = config.timeout ?: DEFAULT_TIMEOUT
+    val logLevel: LogLevel = resolveLogLevel(config.logLevel, env)
 
     init {
         require(timeout > Duration.ZERO) { "timeout must be positive, was $timeout" }

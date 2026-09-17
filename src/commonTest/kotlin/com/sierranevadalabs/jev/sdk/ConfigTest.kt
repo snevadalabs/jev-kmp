@@ -59,9 +59,15 @@ class ConfigTest {
 
     @Test
     fun aNonPositiveTimeoutIsRejected() {
-        assertFailsWith<IllegalArgumentException> { ResolvedConfig(TypeSafeConfig(timeout = Duration.ZERO), { "key" }) }
+        assertFailsWith<IllegalArgumentException> { ResolvedConfig(TypeSafeConfig(timeout = Duration.ZERO), apiKeyOnlyEnv) }
         assertFailsWith<IllegalArgumentException> {
-            ResolvedConfig(TypeSafeConfig(timeout = (-1).seconds), { "key" })
+            ResolvedConfig(TypeSafeConfig(timeout = (-1).seconds), apiKeyOnlyEnv)
         }
     }
 }
+
+/**
+ * An environment that answers for the API key and nothing else, the way a real one does for an unset variable:
+ * a stub returning the same value for every name would hand `TYPESAFE_LOG_LEVEL` a key and fail resolution.
+ */
+private val apiKeyOnlyEnv: (String) -> String? = { if (it == API_KEY_ENV) "key" else null }

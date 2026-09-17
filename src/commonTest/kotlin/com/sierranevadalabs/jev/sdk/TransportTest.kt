@@ -33,6 +33,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
 class TransportTest {
     private val unavailable = HttpStatusCode.ServiceUnavailable
@@ -385,10 +386,12 @@ class TransportTest {
 
             transport.request(HttpMethod.Get, "/v1/models")
 
-            assertEquals(1, lines.size)
-            assertTrue(lines.single().contains("retry 1"), lines.single())
-            assertTrue(lines.single().contains("503"), lines.single())
-            assertFalse(lines.single().contains("secret"), lines.single())
+            // One line per retry, then one for the response the call finally read. Both are leak-tested.
+            assertEquals(2, lines.size, lines.toString())
+            assertTrue(lines[0].contains("retry 1"), lines[0])
+            assertTrue(lines[0].contains("503"), lines[0])
+            assertTrue(lines[1].contains("GET /v1/models <- 200"), lines[1])
+            assertFalse(lines.joinToString("\n").contains("secret"), lines.toString())
             transport.close()
         }
 
@@ -437,6 +440,7 @@ private fun transport(
     log: (String) -> Unit = {},
     random: () -> Double = { 0.0 },
     sleeper: suspend (Long) -> Unit = {},
+    timeSource: TimeSource = TimeSource.Monotonic,
 ): Transport =
     createTransport(
         apiKey = "test-key",
@@ -448,4 +452,5 @@ private fun transport(
         log = log,
         random = random,
         sleeper = sleeper,
+        timeSource = timeSource,
     )
