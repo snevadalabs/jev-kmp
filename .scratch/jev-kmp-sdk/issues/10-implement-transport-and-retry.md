@@ -39,7 +39,7 @@ Nothing to decide — build the layer every call goes through, against the recon
 
 - A scripted sequence of responses plus a recorded list of delays, asserting exactly which attempts happened and exactly which delays were requested, including that attempt 0 carries no `X-TypeSafe-Retry-Count`.
 - Status-code matrix across the configured set, plus the non-retryable statuses.
-- `Retry-After` in both forms **through `MockEngine`, asserting the recorded delay** — this doubles as the regression test that pins `respectRetryAfterHeader = false`: anyone who flips it back to Ktor's own handling goes red on the HTTP-date case. Plus garbage, negative and above-cap values.
+- `Retry-After` in both forms **through `MockEngine`, asserting the recorded delay**. **[amended by *Implement transport and retry*]** The claim that this doubles as the pin on `respectRetryAfterHeader = false` was **wrong and was measured wrong**: with the flag flipped, Ktor computes `maxOf(ourDelay, 0)` because an HTTP-date does not parse as seconds, so the HTTP-date case stays green either way. **The above-cap case is the real pin** — with the flag flipped, `Retry-After: 120` yields 120 000 and the assertion on 500 goes red. Both cases are in the suite. Plus garbage and negative values.
 - Backoff bounds with the jitter source pinned.
 - Per-call policy override isolation: concurrent calls with different policies do not share state. The Python suite needed an entire white-box test for this; here it is a plain assertion over `requestHistory`.
 - Cancellation during the delay propagates and does not retry.
