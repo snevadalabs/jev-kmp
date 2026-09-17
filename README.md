@@ -171,6 +171,18 @@ TYPESAFE_API_KEY=… ./gradlew jvmTest -Ptypesafe.live=true
 `integration.yml` runs the same command nightly and on every push to `main`, using the `JEV_API_KEY` repository
 secret.
 
+### Mutation testing, on demand
+
+```bash
+./gradlew pitestJvm
+```
+
+PIT mutates the JVM compilation of `commonMain` and writes `build/reports/pitest/` (read `mutations.xml`; the
+HTML report mis-attributes line numbers for inlined Kotlin). It re-runs the suite once per mutant and takes
+about two minutes, so it is deliberately **not** part of `check`. The measured baseline, what it says about the
+line-coverage floor, and how to read the survivors are in
+[`.scratch/jev-kmp-sdk/research/22-mutation-testing-evaluation.md`](.scratch/jev-kmp-sdk/research/22-mutation-testing-evaluation.md).
+
 ## Documentation
 
 Learn what TypeSafe can do in the [TypeSafe docs](https://docs.typesafe.ai/). This SDK's own API reference is
