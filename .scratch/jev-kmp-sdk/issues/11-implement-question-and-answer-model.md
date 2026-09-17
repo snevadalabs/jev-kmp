@@ -1,7 +1,7 @@
 # Implement the question and answer model
 
 Type: task
-Status: open
+Status: claimed
 Blocked by: 06, 09
 
 ## Question
