@@ -25,7 +25,9 @@ Deliverable: README, complete KDoc, and the doc-compilation test wired into CI.
 
 ## Answer
 
-README, the KDoc gaps, and both gates. Branch `issue-14-readme-and-kdoc`, unmerged when this was written.
+README, the KDoc gaps, and both gates. Branch `issue-14-readme-and-kdoc`, PR
+[#8](https://github.com/snevadalabs/jev-kmp/pull/8) — shipped but unmerged; the parent session runs the gate
+and merges.
 
 **Premise: both halves were real.** `explicitApi(Strict)` forces nothing about KDoc, and `README.md` was the
 scaffold's placeholder. The KDoc pass found only **two** undocumented public declarations — `NoulAnswer.noul`
