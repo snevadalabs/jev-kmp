@@ -87,3 +87,5 @@ Gate: `./gradlew checkVersion ktlintCheck jvmTest apiCheck` → BUILD SUCCESSFUL
   minus their prefix; ticket 12 should adopt them or the ADR's mapping changes.
 - ADR `0005` is written, so *Write the foundational ADRs* must use other numbers.
 
+**Shipped, unmerged:** branch `issue-07-settle-conformance-fixture-format`, [PR #3](https://github.com/snevadalabs/jev-kmp/pull/3).
+
