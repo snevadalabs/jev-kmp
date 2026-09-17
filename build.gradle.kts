@@ -12,6 +12,48 @@ plugins {
     alias(libs.plugins.maven.publish)
 }
 
+// `conformance/` is the cross-language fixture set, and a KMP `commonTest` cannot read files on Native. The
+// JSON is baked into a generated Kotlin constant so every target's tests read the same bytes. See
+// docs/adr/0005-conformance-fixture-format.md.
+val generateConformanceFixtures by tasks.registering {
+    val source = layout.projectDirectory.dir("conformance")
+    val output = layout.buildDirectory.dir("generated/conformance/kotlin")
+    inputs.dir(source).withPropertyName("fixtures")
+    outputs.dir(output).withPropertyName("sources")
+
+    doLast {
+        // Each fixture is a raw string, so its own line lengths are the generated file's line lengths and the
+        // result satisfies ktlint without an exclusion. `prependIndent` sets up the `trimIndent` that follows.
+        val entries =
+            source.asFile
+                .walkTopDown()
+                .filter { it.isFile && it.extension == "json" }
+                .sortedBy { it.invariantSeparatorsPath }
+                .joinToString(",\n") { file ->
+                    val path = file.relativeTo(source.asFile).invariantSeparatorsPath
+                    val body = file.readText().trimEnd('\n')
+                    require(!body.contains("\"\"\"")) { "$path contains a triple quote" }
+                    val indented = body.replace("$", "\${'$'}").prependIndent("            ")
+                    "        \"$path\" to\n            \"\"\"\n$indented\n            \"\"\".trimIndent()"
+                }
+
+        val target = output.get().file("ConformanceFixtures.kt").asFile
+        target.parentFile.mkdirs()
+        target.writeText(
+            """
+            |// Generated from conformance/ by the generateConformanceFixtures task — do not edit.
+            |package com.sierranevadalabs.jev.sdk.conformance
+            |
+            |internal val FIXTURE_FILES: Map<String, String> =
+            |    mapOf(
+            |$entries,
+            |    )
+            |
+            """.trimMargin(),
+        )
+    }
+}
+
 kotlin {
     // AGP 9 requires com.android.kotlin.multiplatform.library; androidTarget() is going away. Host (unit)
     // tests are off by default in this plugin and must be opted into, or commonTest never runs on Android.
@@ -59,10 +101,15 @@ kotlin {
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.ktor.client.core)
         }
-        commonTest.dependencies {
-            implementation(kotlin("test"))
-            implementation(libs.kotlinx.coroutines.test)
-            implementation(libs.ktor.client.mock)
+        commonTest {
+            kotlin.srcDir(generateConformanceFixtures)
+            dependencies {
+                implementation(kotlin("test"))
+                implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.kotlinx.serialization.json)
+                implementation(libs.ktor.client.core)
+                implementation(libs.ktor.client.mock)
+            }
         }
         // The default engines, so a caller configures nothing. Ktor publishes all four as plain JVM JARs for
         // Android as well as the JVM, which is why androidMain can reuse the OkHttp artifact.
@@ -101,6 +148,14 @@ mavenPublishing {
             developerConnection = "scm:git:ssh://git@github.com/snevadalabs/jev-kmp.git"
         }
     }
+}
+
+// binary-compatibility-validator is applied above to every Kotlin project in this build, including the
+// throwaway `prototype` module. It is not part of the published surface, has no committed dump and will be
+// deleted once tickets 11 and 12 land the real model, so it is skipped explicitly. Removing this block
+// must go together with removing the module, or `apiCheck` fails on a missing dump.
+apiValidation {
+    ignoredProjects += "prototype"
 }
 
 // The version and the changelog are two sources of truth that must not drift. SNAPSHOT versions require an

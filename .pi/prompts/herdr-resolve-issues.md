@@ -28,7 +28,9 @@ For each ticket `<n>`, with `<slug>` = up to 4 kebab-case words from its title:
             --base origin/main --label "issue-<n>" --no-focus)
     pane=$(printf '%s' "$out" | python3 -c 'import sys,json;print(json.load(sys.stdin)["result"]["root_pane"]["pane_id"])')
     wt=$(printf '%s' "$out" | python3 -c 'import sys,json;print(json.load(sys.stdin)["result"]["worktree"]["path"])')
-    herdr agent start issue-<n> --kind pi --pane "$pane" --timeout 90000
+    # A fresh worktree's shell is not always detected as available the instant the pane exists, so retry:
+    for i in $(seq 1 15); do herdr agent start issue-<n> --kind pi --pane "$pane" --timeout 90000 && break; sleep 2; done
+    # Prompt only once the agent is genuinely idle; a prompt sent while the TUI is still drawing is lost.
     herdr agent prompt issue-<n> "/resolve-issue <n>"
 
 Then pull that panel into this workspace and name it after its ticket. `herdr pane move` into an existing workspace needs `--tab` + `--split` + `--target-pane` (`--workspace` alone is rejected): the anchor is `$HERDR_PANE_ID` for the first panel, then whichever pane the Layout rule below splits off — it is required, `pane move` will not guess it. Read the surviving id from `.result.move_result.pane.pane_id`, since a moved pane gets a new id:
