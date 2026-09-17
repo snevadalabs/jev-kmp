@@ -113,7 +113,7 @@ internal sealed class TransportException(
  *
  * The caller's [httpClientConfig] runs first, so a caller can add `Logging` or a custom auth plugin but cannot
  * break the order [HttpRequestRetry] and [HttpTimeout] require. When [engine] is `null` a platform default is
- * created and owned here; an engine that was handed to us is never closed.
+ * created by [engineFactory] and owned here; an engine that was handed to us is never closed.
  */
 internal fun createTransport(
     apiKey: String,
@@ -126,9 +126,10 @@ internal fun createTransport(
     random: () -> Double = { Random.nextDouble() },
     sleeper: suspend (Long) -> Unit = { delay(it) },
     httpClientConfig: HttpClientConfig<*>.() -> Unit = {},
+    engineFactory: () -> HttpClientEngine = ::createDefaultEngine,
 ): Transport {
     val ownsEngine = engine == null
-    val resolvedEngine = engine ?: createDefaultEngine()
+    val resolvedEngine = engine ?: engineFactory()
     val http =
         HttpClient(resolvedEngine) {
             // A 429 is data we map ourselves, not an exception Ktor raises for us.

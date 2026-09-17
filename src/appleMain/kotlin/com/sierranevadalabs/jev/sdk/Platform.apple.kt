@@ -8,6 +8,8 @@ import platform.Foundation.NSProcessInfo
 
 internal actual fun createDefaultEngine(): HttpClientEngine = Darwin.create()
 
+internal actual fun platformEnv(name: String): String? = NSProcessInfo.processInfo.environment[name] as? String
+
 internal actual val runtimeIdentity: String = "${osFamilyName()}/${appleOsVersion()}"
 
 // `operatingSystemVersion` rather than `operatingSystemVersionString`, which Apple does not guarantee parseable.
