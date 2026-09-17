@@ -91,6 +91,14 @@ mavenPublishing {
     }
 }
 
+// binary-compatibility-validator is applied above to every Kotlin project in this build, including the
+// throwaway `prototype` module. It is not part of the published surface, has no committed dump and will be
+// deleted once tickets 11 and 12 land the real model, so it is skipped explicitly. Removing this block
+// must go together with removing the module, or `apiCheck` fails on a missing dump.
+apiValidation {
+    ignoredProjects += "prototype"
+}
+
 // The version and the changelog are two sources of truth that must not drift. SNAPSHOT versions require an
 // Unreleased heading; release versions must name themselves at the top.
 val checkVersion by tasks.registering {
