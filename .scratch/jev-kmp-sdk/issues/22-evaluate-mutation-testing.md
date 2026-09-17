@@ -1,7 +1,7 @@
 # Evaluate mutation testing as a way to find what coverage cannot see
 
 Type: research
-Status: open
+Status: claimed
 Blocked by:
 
 ## Question
