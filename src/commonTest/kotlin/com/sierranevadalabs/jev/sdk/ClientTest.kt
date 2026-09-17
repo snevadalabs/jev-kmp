@@ -226,6 +226,34 @@ class ClientTest {
         }
 
     @Test
+    fun modelsListTakesTheSamePerCallTimeoutAndRetryOverridesAsSystemOne() =
+        runTest {
+            val engine = MockEngine { respond("""{"models":[]}""", HttpStatusCode.ServiceUnavailable) }
+            val client = client(engine, retry = RetryPolicy(maxRetries = 0))
+
+            runCatching {
+                client.models.list(retry = RetryPolicy(maxRetries = 2), timeout = 250.milliseconds)
+            }
+
+            assertEquals(3, engine.requestHistory.size, "the per-call policy wins over the client default")
+            val first = engine.requestHistory.first()
+            assertEquals(250L, first.getCapabilityOrNull(HttpTimeoutCapability)?.requestTimeoutMillis)
+            client.close()
+        }
+
+    @Test
+    fun modelsListWithNoOverridesInheritsTheClientsPolicy() =
+        runTest {
+            val engine = MockEngine { respond("""{"models":[]}""", HttpStatusCode.ServiceUnavailable) }
+            val client = client(engine, retry = RetryPolicy(maxRetries = 2))
+
+            runCatching { client.models.list() }
+
+            assertEquals(3, engine.requestHistory.size, "a null per-call policy inherits the client's")
+            client.close()
+        }
+
+    @Test
     fun modelsListReturnsTheCardsAndIgnoresExtraFields() =
         runTest {
             val engine =

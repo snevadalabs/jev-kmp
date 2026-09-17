@@ -2,6 +2,7 @@ package com.sierranevadalabs.jev.sdk
 
 import com.sierranevadalabs.jev.sdk.conformance.loadConformanceCases
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -34,6 +35,82 @@ class QuestionModelTest {
         assertEquals(prompt, noul("urgent", prompt).prompt)
         assertEquals(mapOf("a" to JsonPrimitive(1)), choice("c", prompt, mapOf("a" to JsonPrimitive(1))).options)
         assertEquals(listOf(JsonPrimitive(1), JsonPrimitive(2)), score("s", prompt, listOf(JsonPrimitive(1), JsonPrimitive(2))).levels)
+    }
+
+    @Test
+    fun noulCriteriaEncodesOnlyTheOutcomeThatIsDescribed() {
+        val yesOnly = noul("urgent", "Is it urgent?", NoulCriteria(ifTrue = "needs a human"))
+        assertEquals(
+            buildJsonObject {
+                put("type", "noul")
+                put("instructions", "Is it urgent?")
+                put("criteria", buildJsonObject { put("true", "needs a human") })
+            },
+            yesOnly.toWireJson(),
+        )
+
+        val noOnly = noul("urgent", "Is it urgent?", NoulCriteria(ifFalse = "routine"))
+        assertEquals(
+            buildJsonObject {
+                put("type", "noul")
+                put("instructions", "Is it urgent?")
+                put("criteria", buildJsonObject { put("false", "routine") })
+            },
+            noOnly.toWireJson(),
+        )
+    }
+
+    @Test
+    fun noulCriteriaWithBothOutcomesEncodesBothSides() {
+        val question = noul("urgent", "Is it urgent?", NoulCriteria("needs a human", "routine"))
+
+        assertEquals(
+            buildJsonObject {
+                put("type", "noul")
+                put("instructions", "Is it urgent?")
+                put(
+                    "criteria",
+                    buildJsonObject {
+                        put("true", "needs a human")
+                        put("false", "routine")
+                    },
+                )
+            },
+            question.toWireJson(),
+        )
+    }
+
+    @Test
+    fun noulWithoutCriteriaOmitsTheKeyEntirely() {
+        assertEquals(
+            buildJsonObject {
+                put("type", "noul")
+                put("instructions", "Is it urgent?")
+            },
+            noul("urgent", "Is it urgent?").toWireJson(),
+        )
+    }
+
+    @Test
+    fun noulCriteriaAcceptsStructuredOutcomeDescriptions() {
+        val yes = buildJsonObject { put("label", "needs a human") }
+        val no = JsonArray(listOf(JsonPrimitive("routine")))
+        val question = noul("urgent", "Is it urgent?", NoulCriteria(ifTrue = yes, ifFalse = no))
+
+        assertEquals(
+            buildJsonObject {
+                put("type", "noul")
+                put("instructions", "Is it urgent?")
+                put(
+                    "criteria",
+                    buildJsonObject {
+                        put("true", yes)
+                        put("false", no)
+                    },
+                )
+            },
+            question.toWireJson(),
+        )
     }
 
     @Test
