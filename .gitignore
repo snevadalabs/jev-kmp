@@ -1,0 +1,21 @@
+# Gradle
+.gradle/
+build/
+.kotlin/
+
+# Local machine configuration (SDK paths, secrets)
+local.properties
+
+# Wayfinder planning tracker — deliberately local, never published
+.scratch/
+
+# IDE
+.idea/
+*.iml
+
+# macOS
+.DS_Store
+
+# Xcode
+xcuserdata/
+*.xcuserstate
