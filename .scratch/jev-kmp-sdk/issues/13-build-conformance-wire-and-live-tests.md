@@ -1,7 +1,7 @@
 # Build the conformance, wire, and live test tiers
 
 Type: task
-Status: open
+Status: claimed
 Blocked by: 07, 12
 
 ## Question
