@@ -110,7 +110,8 @@ known type with a wrong primitive.
 
 ## Outcomes
 
-Branch `junk-input-hardening`, PR opened into `main` (link appended below). Gate: `./gradlew check` **green**
+Branch `junk-input-hardening`, PR [#15](https://github.com/snevadalabs/jev-kmp/pull/15) into `main` (open, not
+merged). Gate: `./gradlew check` **green**
 (ktlint, `apiCheck`, the Dokka KDoc gate, the version/CHANGELOG check, the Java 8 bytecode assertion, the Kover
 floor at 94, and every test target this host runs: JVM, Android host, Apple, Linux). 258 JVM tests, 0 failures.
 
