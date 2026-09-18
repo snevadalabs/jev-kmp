@@ -58,13 +58,27 @@ class ErrorMappingTest {
                 """{"detail":[]}""",
                 """{"detail":{"message":false}}""",
                 """{"detail":[{"loc":["body","questions"]}]}""",
+                """{"detail":42}""",
+                """{"detail":1e3}""",
+                """{"detail":[5]}""",
                 "42",
                 "[1,2]",
+                "1e3",
             )
 
         for (body in bodies) {
             assertEquals(body, extractErrorMessage(body), body)
         }
+    }
+
+    @Test
+    fun capsTheExtractedMessageExactlyAtTheLengthBoundary() {
+        // ticket 22's `extractErrorMessage` boundary mutant: 200 characters is inside the cap, 201 is the first
+        // length that gets the ellipsis, and a blank body is an empty message rather than the raw whitespace.
+        assertEquals("x".repeat(200), extractErrorMessage("x".repeat(200)))
+        assertEquals("x".repeat(200) + "…", extractErrorMessage("x".repeat(201)))
+        assertEquals("", extractErrorMessage(""))
+        assertEquals("", extractErrorMessage("   \n "))
     }
 
     @Test
@@ -76,6 +90,9 @@ class ErrorMappingTest {
         assertEquals("m", extractErrorMessage("""{"detail":[{"loc":["body"],"msg":"m"}]}"""))
         assertEquals("m", extractErrorMessage("""{"detail":[{"loc":"body","msg":"m"}]}"""))
         assertEquals("x.y: m", extractErrorMessage("""{"detail":[{"loc":["x","y"],"msg":"m"}]}"""))
+        assertEquals("questions: m", extractErrorMessage("""{"detail":[{"loc":["body","questions"],"msg":"m"},5]}"""))
+        assertEquals("m", extractErrorMessage("""{"detail":[{"loc":["body",["x"]],"msg":"m"}]}"""))
+        assertEquals("m", extractErrorMessage("""{"detail":[{"loc":[],"msg":"m"}]}"""))
         assertEquals(
             "questions.impact: m; questions: n",
             extractErrorMessage(
@@ -88,7 +105,10 @@ class ErrorMappingTest {
     fun aBlankOrNonJsonBodyParsesToNothingWithoutThrowing() {
         assertNull(parseBody(""))
         assertNull(parseBody("   \n "))
+        assertNull(parseBody("not json"))
+        assertNull(parseBody("{\"a\":"))
         assertEquals(JsonPrimitive("x"), parseBody("\"x\""))
+        assertEquals("1e3", parseBody("1e3")!!.jsonPrimitive.content)
     }
 
     @Test
@@ -111,10 +131,13 @@ class ErrorMappingTest {
                 404 to NotFoundError::class,
                 408 to APIError::class,
                 418 to APIError::class,
+                499 to APIError::class,
                 422 to UnprocessableEntityError::class,
                 429 to RateLimitError::class,
                 500 to InternalServerError::class,
                 529 to InternalServerError::class,
+                599 to InternalServerError::class,
+                600 to APIError::class,
             )
 
         for ((status, type) in expected) {

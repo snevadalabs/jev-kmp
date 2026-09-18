@@ -68,6 +68,18 @@ class SystemOneResponseTest {
     }
 
     @Test
+    fun getOnAnUnknownPrimitiveNamesBothTypes() {
+        // The raw map keeps an unknown primitive; the typed accessor is a checked cast against the question's
+        // own answer type, so reading an unknown one is the same mismatch as reading a known-but-wrong one.
+        val response = SystemOneResponse(mapOf("mystery" to UnknownAnswer("sentiment", JsonPrimitive("frustrated"))))
+
+        val failure = assertFailsWith<AnswerTypeMismatchException> { response[noul("mystery", "?")] }
+
+        assertTrue(failure.message!!.contains("NoulQuestion"), failure.message)
+        assertTrue(failure.message!!.contains("UnknownAnswer"), failure.message)
+    }
+
+    @Test
     fun unknownAnswerSurvivesInTheRawAnswersMap() {
         val unknownAnswer = UnknownAnswer("noul_v2", JsonPrimitive(0.5))
         val unknown = SystemOneResponse(mapOf("urgent" to unknownAnswer))

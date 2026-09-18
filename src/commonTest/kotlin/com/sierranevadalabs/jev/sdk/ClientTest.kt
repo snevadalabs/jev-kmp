@@ -252,6 +252,7 @@ class ClientTest {
 
             val validation = assertIs<APIResponseValidationError>(failure)
             assertEquals("answers.urgent.noul", validation.field)
+            assertEquals("answers.urgent.noul: expected a numeric field 'noul'", validation.message)
             assertEquals(200, validation.status)
         }
 
@@ -260,7 +261,13 @@ class ClientTest {
         runTest {
             // ticket 22's survivors on `decodeSystemOneResponse`'s `as? JsonObject` guards: the key is right
             // and the JSON type is not.
-            for (body in listOf("""{"model":"jev-latest","answers":[]}""", """{"model":"jev-latest","answers":"none"}""")) {
+            for (body in listOf(
+                """{"model":"jev-latest","answers":[]}""",
+                """{"model":"jev-latest","answers":"none"}""",
+                """{"model":"jev-latest","answers":5}""",
+                """{"model":"jev-latest","answers":null}""",
+                """{"model":"jev-latest"}""",
+            )) {
                 val engine = MockEngine { respond(body) }
 
                 val failure = runCatching { client(engine).systemOne("hello", noul("urgent", "?")) }.exceptionOrNull()
@@ -383,14 +390,131 @@ class ClientTest {
     @Test
     fun modelsListNamesTheEndpointWhenTheShapeIsWrong() =
         runTest {
-            for (body in listOf("""{"data":[]}""", "[]", "not json")) {
+            for (body in listOf(
+                """{"data":[]}""",
+                "[]",
+                "not json",
+                "",
+                "{\"models\":5}",
+                "{\"models\":\"x\"}",
+                "{\"models\":{}}",
+                "{\"models\":null}",
+                "{}",
+                "\"x\"",
+                "5",
+                "null",
+            )) {
                 val engine = MockEngine { respond(body) }
 
                 val failure = runCatching { client(engine).models.list() }.exceptionOrNull()
 
                 val validation = assertIs<APIResponseValidationError>(failure, "body: $body")
+                assertEquals("models", validation.field, "body: $body")
                 assertTrue(validation.message!!.contains("GET /v1/models"), validation.message)
                 assertTrue(validation.message!!.contains("expected { models: [...] }"), validation.message)
+            }
+        }
+
+    @Test
+    fun modelsListRejectsAnEntryThatIsNotACardAtItsOwnPosition() =
+        runTest {
+            // ticket 22's `decodeModelCard` / `ModelsApi.list` survivors: an entry that is not an object, one
+            // with no `name`, and one whose `name` is not a string all fail at that entry's own index, so a
+            // catalogue that is half junk does not silently drop or renumber the rest.
+            val cases =
+                mapOf(
+                    """{"models":[5]}""" to "models.0.name",
+                    """{"models":["x"]}""" to "models.0.name",
+                    """{"models":[[]]}""" to "models.0.name",
+                    """{"models":[null]}""" to "models.0.name",
+                    """{"models":[{}]}""" to "models.0.name",
+                    """{"models":[{"name":5}]}""" to "models.0.name",
+                    """{"models":[{"name":null}]}""" to "models.0.name",
+                    """{"models":[{"name":["a"]}]}""" to "models.0.name",
+                    """{"models":[{"name":"a"},5]}""" to "models.1.name",
+                    """{"models":[5,{"name":"a"}]}""" to "models.0.name",
+                )
+
+            for ((body, field) in cases) {
+                val engine = MockEngine { respond(body) }
+
+                val failure = runCatching { client(engine).models.list() }.exceptionOrNull()
+
+                val validation = assertIs<APIResponseValidationError>(failure, body)
+                assertEquals(field, validation.field, body)
+                assertEquals("GET /v1/models: $field: expected a string field 'name'", validation.message, body)
+                assertEquals(200, validation.status, body)
+            }
+        }
+
+    @Test
+    fun modelsListDropsAnOptionalFieldOfTheWrongTypeRatherThanCoercingIt() =
+        runTest {
+            // ticket 22's four `stringFieldOrNull` survivors: `description` and `release_date` are optional, so a
+            // value that is not a string reads as absent instead of being stringified or failing the catalogue.
+            val bodies =
+                listOf(
+                    """{"models":[{"name":"a","description":5,"release_date":true}]}""",
+                    """{"models":[{"name":"a","description":{},"release_date":[]}]}""",
+                    """{"models":[{"name":"a","description":null,"release_date":null}]}""",
+                )
+
+            for (body in bodies) {
+                val engine = MockEngine { respond(body) }
+
+                assertEquals(listOf(ModelCard("a", null, null)), client(engine).models.list(), body)
+            }
+        }
+
+    @Test
+    fun systemOneRejectsATopLevelBodyThatIsNotAnObject() =
+        runTest {
+            // ticket 22's `decodeSystemOneResponse` survivors on the first `as? JsonObject`: a top-level array,
+            // number, string or null is a validation failure with no field to name, never a ClassCastException.
+            for (body in listOf("[]", "5", "\"x\"", "null", "not json", "")) {
+                val engine = MockEngine { respond(body) }
+
+                val failure = runCatching { client(engine).systemOne("hello", noul("urgent", "?")) }.exceptionOrNull()
+
+                val validation = assertIs<APIResponseValidationError>(failure, body)
+                assertNull(validation.field, body)
+                assertEquals("expected a JSON object response body", validation.message, body)
+                assertEquals(200, validation.status, body)
+            }
+        }
+
+    @Test
+    fun systemOneToleratesAMalformedUsageAndModelWithoutFailing() =
+        runTest {
+            // ticket 22's `intOrNull` survivor and the `usage as? JsonObject` guard: `usage` and `model` are
+            // optional response fields, so a wrong JSON type reads as absent while a real integer is kept.
+            val usages =
+                mapOf(
+                    """{"answers":{},"usage":5}""" to null,
+                    """{"answers":{},"usage":[]}""" to null,
+                    """{"answers":{},"usage":null}""" to null,
+                    """{"answers":{},"usage":{}}""" to Usage(null, null),
+                    """{"answers":{},"usage":{"billing_units":9}}""" to Usage(null, null),
+                    """{"answers":{},"usage":{"input_tokens":"5"}}""" to Usage(null, null),
+                    """{"answers":{},"usage":{"input_tokens":3.5}}""" to Usage(null, null),
+                    """{"answers":{},"usage":{"input_tokens":3.0}}""" to Usage(null, null),
+                    """{"answers":{},"usage":{"input_tokens":true}}""" to Usage(null, null),
+                    """{"answers":{},"usage":{"input_tokens":null}}""" to Usage(null, null),
+                    """{"answers":{},"usage":{"input_tokens":99999999999}}""" to Usage(null, null),
+                    """{"answers":{},"usage":{"input_tokens":-1}}""" to Usage(-1, null),
+                    """{"answers":{},"usage":{"input_tokens":12,"output_tokens":3}}""" to Usage(12, 3),
+                )
+
+            for ((body, expected) in usages) {
+                val engine = MockEngine { respond(body) }
+
+                assertEquals(expected, client(engine).systemOne("hello", noul("urgent", "?")).usage, body)
+            }
+
+            for (body in listOf("""{"answers":{},"model":5}""", """{"answers":{},"model":null}""", """{"answers":{},"model":[]}""")) {
+                val engine = MockEngine { respond(body) }
+
+                assertNull(client(engine).systemOne("hello", noul("urgent", "?")).model, body)
             }
         }
 

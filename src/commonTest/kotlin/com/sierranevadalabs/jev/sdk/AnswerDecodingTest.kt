@@ -123,6 +123,107 @@ class AnswerDecodingTest {
     }
 
     @Test
+    fun anAnswerEntryThatIsNotAnObjectFailsNamingTheAnswerField() {
+        // ticket 22's `decodeAnswer` survivors: an entry that is not an object at all must fail at the answer's
+        // own path, not coerce to an UnknownAnswer or blow up one frame later.
+        for (answers in listOf(
+            """{"urgent": 5}""",
+            """{"urgent": "x"}""",
+            """{"urgent": []}""",
+            """{"urgent": null}""",
+            """{"urgent": true}""",
+        )) {
+            val failure = assertFailsWith<ResponseValidationException>(answers) { decode(answers) }
+
+            assertEquals("answers.urgent", failure.fieldPath, answers)
+            assertEquals("answers.urgent: expected an answer object", failure.message, answers)
+        }
+    }
+
+    @Test
+    fun anOutOfRangeOrHugeNumberIsForwardedVerbatimRatherThanRangeChecked() {
+        // The brief fixes client-side validation at exactly two things (a non-empty question list, a score with
+        // two levels), so a numeric field decodes as sent: 0, a negative, a fraction and an overflow to
+        // Infinity are the server's business. The KDoc's `0..1` describes the wire, not a check we perform.
+        assertEquals(NoulAnswer(0.0), decode("""{"urgent": {"type": "noul", "noul": 0}}""").getValue("urgent"))
+        assertEquals(NoulAnswer(-1.0), decode("""{"urgent": {"type": "noul", "noul": -1}}""").getValue("urgent"))
+        assertEquals(NoulAnswer(2.0), decode("""{"urgent": {"type": "noul", "noul": 2}}""").getValue("urgent"))
+        assertEquals(NoulAnswer(0.25), decode("""{"urgent": {"type": "noul", "noul": 0.25}}""").getValue("urgent"))
+        assertEquals(
+            NoulAnswer(Double.POSITIVE_INFINITY),
+            decode("""{"urgent": {"type": "noul", "noul": 1e400}}""").getValue("urgent"),
+        )
+        assertEquals(
+            ChoiceAnswer("a", mapOf("a" to 0.0, "b" to -1.0, "c" to Double.POSITIVE_INFINITY), 0.5),
+            decode(
+                """{"urgent": {"type": "choice", "choice": "a", "confidence": 0.5,
+                   "probabilities": {"a": 0, "b": -1, "c": 1e400}}}""",
+            ).getValue("urgent"),
+        )
+    }
+
+    @Test
+    fun aNumericFieldThatIsNotAJsonNumberFailsNamingTheFieldInsteadOfBeingCoerced() {
+        // ticket 22's `doubleAt` / `asDouble` survivors: the right key with a value that is neither a JSON
+        // number nor a JSON string about it. Object, array and explicit null all fail at the exact field.
+        val cases =
+            mapOf(
+                """{"urgent": {"type": "noul", "noul": {}}}""" to "answers.urgent.noul",
+                """{"urgent": {"type": "noul", "noul": []}}""" to "answers.urgent.noul",
+                """{"urgent": {"type": "noul", "noul": null}}""" to "answers.urgent.noul",
+                """{"urgent": {"type": "choice", "choice": "a", "confidence": 1.0, "probabilities": []}}""" to
+                    "answers.urgent.probabilities",
+                """{"urgent": {"type": "choice", "choice": "a", "confidence": 1.0, "probabilities": {"a": {}}}}""" to
+                    "answers.urgent.probabilities.a",
+                """{"urgent": {"type": "choice", "choice": "a", "confidence": 1.0, "probabilities": {"a": []}}}""" to
+                    "answers.urgent.probabilities.a",
+            )
+
+        for ((answers, field) in cases) {
+            val failure = assertFailsWith<ResponseValidationException>(answers) { decode(answers) }
+
+            assertEquals(field, failure.fieldPath, answers)
+            assertTrue(failure.message!!.startsWith("$field: "), failure.message)
+        }
+    }
+
+    @Test
+    fun scoreOrdinalsThatDoNotFitAnIntFailNamingTheOffendingKey() {
+        assertEquals(
+            mapOf(-1 to JsonPrimitive("x")),
+            assertIs<ScoreAnswer>(
+                decode(
+                    """{"urgent":{"type":"score","score":1.0,"confidence":0.5,"legend":{"-1":"x"},"probabilities":{"-1":0.5}}}""",
+                ).getValue("urgent"),
+            ).legend,
+        )
+
+        val cases =
+            mapOf(
+                """{"urgent":{"type":"score","score":1.0,"confidence":0.5,"legend":{"1.5":"x"},"probabilities":{"0":0.5}}}""" to
+                    "answers.urgent.legend.1.5",
+                """{"urgent":{"type":"score","score":1.0,"confidence":0.5,"legend":{"99999999999":"x"},"probabilities":{"0":0.5}}}""" to
+                    "answers.urgent.legend.99999999999",
+            )
+
+        for ((answers, field) in cases) {
+            val failure = assertFailsWith<ResponseValidationException>(answers) { decode(answers) }
+
+            assertEquals(field, failure.fieldPath, answers)
+        }
+    }
+
+    @Test
+    fun anEmptyTypeStringDegradesToUnknownAnswerLikeAnyOtherUnknownPrimitive() {
+        // `type` is a server-owned string with no enum on our side, so a value we do not model — including the
+        // empty string — takes the documented degrade path rather than failing the whole response.
+        val unknown = assertIs<UnknownAnswer>(decode("""{"urgent": {"type": "", "noul": 0.5}}""").getValue("urgent"))
+
+        assertEquals("", unknown.type)
+        assertEquals("0.5", (unknown.raw as JsonObject).getValue("noul").jsonPrimitive.content)
+    }
+
+    @Test
     fun aKnownAnswerFieldWithTheWrongJsonTypeFailsNamingTheFieldPath() {
         // ticket 22's `as? JsonObject` / `as? JsonPrimitive` survivors on Answers.kt: the key is right and the
         // JSON type is not, so the answer must fail naming the exact field rather than coerce or crash later.

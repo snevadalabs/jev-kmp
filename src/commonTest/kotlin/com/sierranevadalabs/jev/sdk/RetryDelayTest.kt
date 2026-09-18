@@ -73,6 +73,45 @@ class RetryDelayTest {
     }
 
     @Test
+    fun anUnusableRetryAfterMsHeaderFallsThroughToRetryAfter() {
+        // ticket 22's `parseRetryAfterMs` survivors: the millisecond header is the preferred form, so when it is
+        // absent, non-numeric, non-finite, negative or blank it must fall through rather than be coerced or
+        // crash on the missing value.
+        assertNull(parseRetryAfterMs(headersOf("retry-after-ms", "-1"), now))
+        assertNull(parseRetryAfterMs(headersOf("retry-after-ms", "abc"), now))
+        assertNull(parseRetryAfterMs(headersOf("retry-after-ms", ""), now))
+        assertNull(parseRetryAfterMs(headersOf("retry-after-ms", "   "), now))
+        assertNull(parseRetryAfterMs(headersOf("retry-after-ms", "Infinity"), now))
+        assertNull(parseRetryAfterMs(headersOf("retry-after-ms", "-Infinity"), now))
+        assertNull(parseRetryAfterMs(headersOf("retry-after-ms", "NaN"), now))
+        assertEquals(2_000L, parseRetryAfterMs(multiHeaders("retry-after-ms" to "abc", "Retry-After" to "2"), now))
+        assertEquals(2_000L, parseRetryAfterMs(multiHeaders("retry-after-ms" to "-1", "Retry-After" to "2"), now))
+        assertEquals(2_000L, parseRetryAfterMs(multiHeaders("retry-after-ms" to "Infinity", "Retry-After" to "2"), now))
+    }
+
+    @Test
+    fun aFractionalRetryAfterMsTruncatesAndAHugeOneSaturates() {
+        assertEquals(0L, parseRetryAfterMs(headersOf("retry-after-ms", "0"), now))
+        assertEquals(3L, parseRetryAfterMs(headersOf("retry-after-ms", "3.5"), now))
+        assertEquals(1_500L, parseRetryAfterMs(headersOf("retry-after-ms", "1500.9"), now))
+        assertEquals(Long.MAX_VALUE, parseRetryAfterMs(headersOf("retry-after-ms", "1e300"), now))
+        // Exactly Double.MAX_VALUE is still finite, so it is a delay; the multiplication saturates the Long.
+        assertEquals(Long.MAX_VALUE, parseRetryAfterMs(headersOf("retry-after-ms", "1.7976931348623157E308"), now))
+    }
+
+    @Test
+    fun aHugeRetryAfterSecondsSaturatesAndANonFiniteOneIsRejected() {
+        assertEquals(3_500L, parseRetryAfterMs(headersOf("Retry-After", "3.5"), now))
+        assertEquals(Long.MAX_VALUE, parseRetryAfterMs(headersOf("Retry-After", "1e300"), now))
+        assertEquals(Long.MAX_VALUE, parseRetryAfterMs(headersOf("Retry-After", "1.7976931348623157E308"), now))
+        // Past Double.MAX_VALUE the value is no longer a finite delta, so it is not a delay at all.
+        assertNull(parseRetryAfterMs(headersOf("Retry-After", "1e400"), now))
+        assertNull(parseRetryAfterMs(headersOf("Retry-After", "Infinity"), now))
+        assertNull(parseRetryAfterMs(headersOf("Retry-After", "NaN"), now))
+        assertNull(parseRetryAfterMs(headersOf("Retry-After", "  "), now))
+    }
+
+    @Test
     fun aRetryAfterAboveTheCapFallsBackToTheBackoff() {
         val policy = RetryPolicy(backoffJitter = 0.0)
 
