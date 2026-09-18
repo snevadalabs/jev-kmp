@@ -418,6 +418,15 @@ tasks.register<info.solidsoft.gradle.pitest.PitestTask>("pitestJvm") {
         layout.projectDirectory.dir("src/jvmMain/kotlin"),
     )
     mutators.set(setOf("STRONGER"))
+
+    // Kotlin inlines lambda bodies into synthetic methods named `enclosing$lambda$<n>` on the real class,
+    // so PIT reports targets that exist in no source file. Nearly all of them are `NullReturnVals` on a
+    // lambda returning Unit, which cannot be observed by any test. Scope is deliberately the method name:
+    // `avoidCallsTo` and an `*$*` class glob were both tried and rejected as too coarse for Kotlin, since
+    // they suppress every mutant on a line that merely mentions `runCatching`/`Intrinsics` (which includes
+    // whole one-expression functions such as `parseBody`) and every mutant inside a suspend body.
+    excludedMethods.set(setOf("*lambda*"))
+
     verbosity.set("VERBOSE")
     timestampedReports.set(false)
     outputFormats.set(setOf("XML", "HTML"))

@@ -596,3 +596,86 @@ M = compiler-generated/mechanical. E = equivalent (no input distinguishes it). U
 | Transport.kt | `toTransportResponse` | 210 | RemoveConditionalMutator_EQUAL_ELSE | removed conditional - replaced equality check with false | U |
 
 Bucket totals: U 157, D 33, M 23, E 2
+
+## Amendment — the survivor filter, and the fact that the run does not reproduce
+
+Added after `pitestJvm` gained a filter, and after two consecutive runs of the *same* configuration disagreed.
+
+`pitestJvm` now sets `excludedMethods = ["*lambda*"]`. Kotlin inlines a lambda body into a synthetic method
+named `enclosing$lambda$<n>` on the real class, so PIT reports targets that exist in no source file; nearly all
+are `NullReturnVals` on a lambda returning Unit, which no test can observe. Measured effect:
+
+| | before | after |
+|---|---|---|
+| generated | 767 | 727 |
+| covered | 735 | 697 |
+| killed | 589 | 573 |
+| **survivors** | **139** | **122** |
+| no coverage | 32 | 30 |
+| test strength | 81.1 % | 82.5 % (83.0 % on the repeat run) |
+| mutation score | 77.7 % | 79.1 % |
+
+Two other filters were tried and **reverted, because Kotlin puts the suppressed call on the same source line as
+real logic**:
+
+* `avoidCallsTo = ["kotlin.ResultKt", "kotlin.jvm.internal"]`. PIT documents it as "any lines of code containing
+  calls to these classes will not be mutated" — the scope is the *line*, not the call. `parseBody` is a
+  one-expression function whose body contains `runCatching`, so **all four of its malformed-body conditionals
+  vanished and the function had zero mutants left**. `failureLine`'s elvis died the same way, because
+  `::class.simpleName` emits `Intrinsics.checkNotNullExpressionValue`. Losing `parseBody` is losing the entry
+  point of the malformed-data contract, which is the cluster this tool was chosen for.
+* `excludedClasses = ["*$*"]`. A suspend function's body compiles into `Enclosing$1.invokeSuspend`, so
+  `TypeSafeClientImpl$models$1:144` is `models()`'s own body, not a lambda.
+
+`excludedMethods` is method-scoped and cost 3 real-but-log-only survivors (`createTransport…$lambda$4:158`, the
+retry line) and ~13 equivalent Unit returns. `assembleHeaders$merge` is a local function, not a lambda, so it
+survives the glob. One caveat: the glob would also skip a hand-written function whose name contains `lambda`.
+
+### Two identical runs disagree on 6 of 727 mutants (0.8 %)
+
+Run 1 → run 2, same config, same tree, no edits:
+
+* `Transport.request-Zzr-CC0:257` regressed SURVIVED.
+* `ClientKt$createClient$4.invokeSuspend:102`, `ModelsApi.list:67`, `ResolvedConfig.<init>:70`,
+  `Transport.request:245`, `TypeSafeClientImpl$models$1:143` became KILLED.
+* The same `request:257` had moved the *other* way in the preceding pair of runs, so it flips in both directions.
+* Test strength moved 82.5 % → 83.0 % between runs that differ in nothing.
+
+The flipping mutants are the error/cancellation/timing paths plus three `ResultKt::throwOnFailure` ones. This
+reproduces ticket 22's 0.8 % figure as *named* mutants, and it sets three constraints:
+
+1. **No threshold is defensible**, restated with evidence.
+2. **A committed survivor baseline cannot stay clean.** Every run would report ~6 spurious NEW/FIXED entries, so
+   a "no new survivors on changed classes" gate would be flaky by construction unless those mutants are named
+   and handled individually.
+3. Only a difference well above ~6 mutants means anything. The 139 → 122 filter result does. The
+   82.5 % → 83.0 % strength move does not.
+
+### Baseline ledger: mechanically sound, deliberately not adopted
+
+A 30-line prototype was built and proven against four cases. Its key is PIT's own identity tuple —
+`class, method, methodDescription, mutator, indexes` — and deliberately **not** the line number, which is what
+makes it survive ordinary edits:
+
+| case | result |
+|---|---|
+| run against its own baseline | 0 new, 0 fixed, 0 stale |
+| every line number shifted by +10 (a 10-line insert above the classes) | **0 new, 0 stale** — the key is line-independent |
+| one mutant removed from one method (a real edit) | 1 STALE, named correctly |
+| one survivor becomes killed | 1 FIXED, named correctly |
+
+Not adopted, for three reasons. The triage labour is 122 entries, and the bucket table above already carries that
+reasoning. There is **no previous release** to baseline against — v0.1.0 has not shipped, so the first run
+*creates* the baseline and it earns nothing until a second release exists. And constraint 2 above caps its
+precision at ±6 mutants per run regardless.
+
+If a delta is wanted at v0.2.0, use PIT's own history mechanism (`--historyInputLocation` /
+`--historyOutputLocation`; the build already points `defaultFileForHistoryData` at `build/pitHistory.txt`, but no
+file is written until history is enabled) rather than introducing a second format. It carries the same identity
+key and additionally scopes a run to changed classes — at the cost of reporting cached statuses instead of
+re-deriving them, which papers over the flakiness above rather than resolving it.
+
+The arcmutate Kotlin plugin was considered and **declined**: it is the one tool that filters Kotlin's
+compiler-generated null handling properly (default = compiler-generated subsets, `+KOTLIN_NO_NULLS` = all,
+including hand-rolled), which is the largest remaining survivor family here, but it is a paid licence and would
+put a third party's artefact on the path of a release-time check.
