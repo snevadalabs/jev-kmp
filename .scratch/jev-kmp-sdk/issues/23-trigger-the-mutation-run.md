@@ -52,6 +52,8 @@ Answer carrying the numbers the run produced.
 
 ## Answer
 
+**Shipped, unmerged**: PR <https://github.com/snevadalabs/jev-kmp/pull/14> (the parent session merges).
+
 **Built.** `docs/releasing.md` — the pre-tag procedure in order (`check` green on `main`, then `pitestJvm`, then
 the human prerequisites linked to [Publish 0.1.0](15-publish-0.1.0.md), not restated), the baseline, and the
 comparison rule. `.github/workflows/publish.yml` gains one `pitestJvm` step between `checkVersion` and
