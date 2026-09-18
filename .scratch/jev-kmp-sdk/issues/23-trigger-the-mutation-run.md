@@ -89,3 +89,11 @@ figures stay the historical measurement.
 
 **Gate.** `./gradlew check --rerun-tasks` green (50 s), on the merged tree and after the doc's numbers were
 corrected to the measured run.
+
+**Parent correction (merge).** The Answer's premise that *"ticket 21 has not landed"* is true of this branch and
+false of the repository: this worktree was cut from `ece128a`, before `origin/issue-21-replicate-sibling-test-cases`
+merged, so its 762-mutant / 183-survivor / 74.9% run measured the pre-port tree (ticket 21 started from 185
+survivors). `docs/releasing.md`'s baseline has been replaced with the runs at `39eaccb` on the tree as it stands
+(727 mutants, 118–122 survivors, 82.5–83.0% strength), and the stale figure now appears there only as provenance
+with the reason it is not comparable. Nothing else in the branch needed changing: the workflow step, the README
+pointer, the eight POM checks and the "reviewed, not run" caveat all still hold.

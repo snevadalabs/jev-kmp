@@ -21,16 +21,22 @@ rather than restated here.
 
 ## Reading the number
 
-The baseline from the 2026-09-18 run on the `0.1.0` tree: 762 mutants generated, 546 detected (540 killed, 6 timed out)
-of 729 covered — **test strength 74.9%** — with **183 survivors** and 33 mutants on lines no test
-executes. That sits against 95.33% Kover line coverage measured on the same compilation when the comparison was
-first made (the floor is 94): a quarter of the covered mutants still live. The gap is the point of taking the
-measurement at all.
+The baseline from the runs at `39eaccb`, on the `0.1.0` tree as it stands (ticket 21's test port merged, and the
+PIT filter narrowed to `excludedMethods = *lambda*` after two wider filters were measured and rejected): **727
+mutants generated**, 697 covered, **118–122 survivors**, 30 of them on lines no test executes, **test strength
+82.5–83.0%** — the range is two consecutive runs of an unchanged tree. That sits against 95.33% Kover line
+coverage measured on the same compilation (the floor is 94): about a fifth of the covered mutants still live. The
+gap is the point of taking the measurement at all.
 
-The rule is a comparison, not a threshold. **A survivor count that has not dropped after ticket 21's port is a
-signal to investigate a decode path, not a number to lower.** There is no useful floor at this size: one mutant
-is about 0.14pp and repeat runs flip roughly 0.8% of mutants, so a score within a point of the baseline is
-noise. When the count moves the wrong way, classify the survivors first — equivalent mutant, genuinely unpinned
-behaviour, or dead code — using the per-mutant classification in
+An earlier pass recorded 762 mutants and 183 survivors here. That worktree was cut from `ece128a`, before ticket
+21's test port merged, so its numbers describe the pre-port tree (185 survivors is what ticket 21 started from) and
+should not be compared against the run above.
+
+The rule is a comparison, not a threshold. **A survivor count that has not dropped is a signal to investigate a
+decode path, not a number to lower.** Ticket 21's port is the worked example: nine malformed-body and edge-value
+tests took survivors 185 → 139 and test strength 74.6% → 81.1%. There is no useful floor at this size: one mutant
+is about 0.14pp and repeat runs flip roughly six mutants, so a score within a point of the baseline is noise. When
+the count moves the wrong way, classify the survivors first — equivalent mutant, genuinely unpinned behaviour, or
+dead code — using the per-mutant classification in
 [research/22](../.scratch/jev-kmp-sdk/research/22-mutation-testing-evaluation.md). Add a case for a genuinely
 unpinned one; do not chase the score.
