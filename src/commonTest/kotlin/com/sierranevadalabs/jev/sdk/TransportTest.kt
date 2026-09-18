@@ -6,6 +6,7 @@ import io.ktor.client.engine.mock.respondError
 import io.ktor.client.engine.mock.toByteArray
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.HttpTimeoutCapability
+import io.ktor.http.ContentType
 import io.ktor.http.Headers
 import io.ktor.http.HeadersBuilder
 import io.ktor.http.HttpMethod
@@ -17,12 +18,14 @@ import io.ktor.util.date.getTimeMillis
 import io.ktor.util.date.truncateToSeconds
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlinx.io.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -137,6 +140,51 @@ class TransportTest {
             transport.request(HttpMethod.Get, "/v1/models")
 
             assertEquals(listOf(500L, 1_000L, 2_000L, 4_000L, 5_000L), delays)
+            transport.close()
+        }
+
+    @Test
+    fun zeroMaxRetriesDisablesRetrying() =
+        runTest {
+            // ported from typesafe-sdk-js/test/reliability.test.ts — "per-call maxRetries overrides the client,
+            // and 0 disables retries". Zero is the value a caller reaches for to stop the SDK retrying at all.
+            var attempts = 0
+            val engine =
+                MockEngine {
+                    attempts++
+                    respondError(unavailable)
+                }
+            val transport = transport(engine, retryPolicy = RetryPolicy(maxRetries = 0))
+
+            val response = transport.request(HttpMethod.Get, "/v1/models")
+
+            assertEquals(unavailable.value, response.status)
+            assertEquals(1, attempts)
+            transport.close()
+        }
+
+    @Test
+    fun anAlreadyCancelledScopeNeverReachesTheEngine() =
+        runTest {
+            // ported from typesafe-sdk-js/test/retry.test.ts — "rejects immediately if the signal is already
+            // aborted". The coroutine is our abort signal, so a cancelled scope must not put a request on the
+            // wire, let alone retry one.
+            var attempts = 0
+            val engine =
+                MockEngine {
+                    attempts++
+                    respond("""{"ok":true}""")
+                }
+            val transport = transport(engine)
+            val cancelled = Job().apply { cancel() }
+
+            val failure =
+                runCatching {
+                    withContext(cancelled) { transport.request(HttpMethod.Get, "/v1/models") }
+                }.exceptionOrNull()
+
+            assertIs<CancellationException>(failure)
+            assertEquals(0, attempts)
             transport.close()
         }
 
@@ -308,6 +356,42 @@ class TransportTest {
             assertEquals("typesafe-sdk-kotlin/0.1.0", request.headers[SDK_HEADER])
             assertTrue(request.headers[RUNTIME_HEADER]?.contains('/') == true)
             assertEquals("""{"state":"x"}""", request.body.toByteArray().decodeToString())
+            transport.close()
+        }
+
+    @Test
+    fun replacesProtectedHeadersWhateverCaseTheCallerSpelledThemIn() =
+        runTest {
+            // ported from typesafe-sdk-js/test/release-regressions.test.ts — "replaces mixed-case defaults and
+            // protects every SDK header on every attempt". The exact-case `Accept` pair and the retry-count drop
+            // are already pinned above; what was missing is a differently-spelled protected name, which the
+            // lowercase-keyed merge has to fold onto the same entry rather than leave beside ours.
+            val engine = MockEngine { respond("""{"ok":true}""") }
+            val transport =
+                transport(
+                    engine,
+                    defaultHeaders =
+                        mapOf(
+                            "authorization" to "Bearer caller",
+                            "content-TYPE" to "text/plain",
+                            "x-typesafe-sdk" to "caller/9",
+                            "X-TYPESAFE-RUNTIME" to "caller",
+                            "x-typesafe-retry-count" to "9",
+                        ),
+                )
+
+            transport.request(HttpMethod.Post, "/v1/system-one", body = """{"state":"x"}""")
+
+            val request = engine.requestHistory.single()
+            assertEquals("Bearer test-key", request.headers[AUTHORIZATION_HEADER])
+            assertEquals("typesafe-sdk-kotlin/0.1.0", request.headers[SDK_HEADER])
+            assertTrue(request.headers[RUNTIME_HEADER]?.contains('/') == true, request.headers[RUNTIME_HEADER])
+            assertNull(request.headers[RETRY_COUNT_HEADER], "a caller-supplied retry count is removed, whatever case it used")
+            for (name in listOf(AUTHORIZATION_HEADER, SDK_HEADER, RUNTIME_HEADER)) {
+                assertEquals(1, request.headers.getAll(name)?.size, "$name must appear exactly once")
+            }
+            assertEquals(ContentType.Application.Json, request.body.contentType, "the caller's content type loses to ours")
+            assertTrue((request.headers.getAll(CONTENT_TYPE_HEADER)?.size ?: 0) <= 1, "content type is not duplicated")
             transport.close()
         }
 

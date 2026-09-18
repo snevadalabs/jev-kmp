@@ -25,10 +25,31 @@ import kotlin.time.TimeSource
  *
  * An implementation holds the API key and never prints it: not in a generated `toString()`, not in any
  * `toString()` we write, not in a log line, and not in an exception.
+ *
+ * Every property below is the value that actually took effect, resolved once when the client was built as
+ * `explicit → environment → SDK default`. The API key is deliberately absent: no accessor exposes it.
  */
 public interface TypeSafeClient : AutoCloseable {
     /** The model catalogue, reached as `client.models.list()`. */
     public val models: Models
+
+    /** The effective API root every request is sent to: explicit, then `TYPESAFE_BASE_URL`, then `https://api.typesafe.ai`. */
+    public val baseUrl: String
+
+    /** The effective model a call uses when it names none: explicit, then `TYPESAFE_DEFAULT_MODEL`, then `jev-latest`. */
+    public val defaultModel: String
+
+    /** The effective per-attempt request timeout a call uses when it overrides nothing: explicit, else 10 seconds. */
+    public val timeout: Duration
+
+    /** The effective retry policy a call uses when it passes none. */
+    public val retry: RetryPolicy
+
+    /** The effective log level: explicit, then `TYPESAFE_LOG_LEVEL`, then [LogLevel.Off]. */
+    public val logLevel: LogLevel
+
+    /** The effective headers sent on every request, before the caller's per-call headers and the SDK's own. */
+    public val defaultHeaders: Map<String, String>
 
     /**
      * Asks one or more typed questions of [state] in a single call.
@@ -88,9 +109,9 @@ internal fun createClient(
             apiKey = resolved.apiKey,
             baseUrl = resolved.baseUrl,
             engine = config.engine,
-            defaultHeaders = config.defaultHeaders,
+            defaultHeaders = resolved.defaultHeaders,
             timeout = resolved.timeout,
-            retryPolicy = config.retry,
+            retryPolicy = resolved.retry,
             log = logSink(resolved.logLevel, sink),
             httpClientConfig = config.httpClientConfig,
             engineFactory = engineFactory,
@@ -98,13 +119,25 @@ internal fun createClient(
             sleeper = sleeper,
             timeSource = timeSource,
         )
-    return TypeSafeClientImpl(transport, resolved.defaultModel)
+    return TypeSafeClientImpl(transport, resolved)
 }
 
 internal class TypeSafeClientImpl(
     private val transport: Transport,
-    private val defaultModel: String,
+    resolved: ResolvedConfig,
 ) : TypeSafeClient {
+    override val baseUrl: String = resolved.baseUrl
+
+    override val defaultModel: String = resolved.defaultModel
+
+    override val timeout: Duration = resolved.timeout
+
+    override val retry: RetryPolicy = resolved.retry
+
+    override val logLevel: LogLevel = resolved.logLevel
+
+    override val defaultHeaders: Map<String, String> = resolved.defaultHeaders
+
     // The resource gets a closure, not the transport, so it never has the API key in reach.
     override val models: Models =
         ModelsApi { timeout, retry ->

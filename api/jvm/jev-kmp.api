@@ -212,7 +212,13 @@ public final class com/sierranevadalabs/jev/sdk/SystemOneResponse {
 }
 
 public abstract interface class com/sierranevadalabs/jev/sdk/TypeSafeClient : java/lang/AutoCloseable {
+	public abstract fun getBaseUrl ()Ljava/lang/String;
+	public abstract fun getDefaultHeaders ()Ljava/util/Map;
+	public abstract fun getDefaultModel ()Ljava/lang/String;
+	public abstract fun getLogLevel ()Lcom/sierranevadalabs/jev/sdk/LogLevel;
 	public abstract fun getModels ()Lcom/sierranevadalabs/jev/sdk/Models;
+	public abstract fun getRetry ()Lcom/sierranevadalabs/jev/sdk/RetryPolicy;
+	public abstract fun getTimeout-UwyO8pc ()J
 	public abstract fun systemOne-FHKeTTw (Lkotlinx/serialization/json/JsonElement;[Lcom/sierranevadalabs/jev/sdk/Question;Ljava/lang/String;Lkotlin/time/Duration;Lcom/sierranevadalabs/jev/sdk/RetryPolicy;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 

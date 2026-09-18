@@ -1,7 +1,7 @@
 # Replicate the sibling test cases, and expose the resolved settings
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 20
 
 ## Question
@@ -147,3 +147,89 @@ because the reason it exists is not visible from the code.
 `./gradlew apiDump`, the KDoc-snippet extension of the existing Gradle task, and an Answer saying which sibling
 files were mined, what was ported, what was checked and already covered, and what was deliberately not ported and
 why. `./gradlew check` green.
+
+## Answer
+
+**Done and shipped on this branch, unmerged — [PR #13](https://github.com/snevadalabs/jev-kmp/pull/13).**
+`./gradlew check` green, `apiDump` committed. Mined
+`typesafe-sdk-js/test/{errors,release-regressions,reliability,retry}.test.ts` and Python's
+`tests/{test_types,test_responses,test_docs}.py` (clones at `/tmp/ts-study/`). Nothing in sections A–C failed for a
+reason that is ours: every ported case describes what the code already does.
+
+**A — ported** (each case carries the sibling test's name in a comment):
+
+| item | test | pinned |
+|---|---|---|
+| 1 | `ClientTest.aJsonErrorBodyIsParsedWhateverTheContentTypeSays` | a JSON error body still extracts its message with no `content-type` and with `text/plain` |
+| 2 | `TransportTest.replacesProtectedHeadersWhateverCaseTheCallerSpelledThemIn` | `authorization`/`content-TYPE`/`x-typesafe-sdk`/`X-TYPESAFE-RUNTIME`/`x-typesafe-retry-count` through `defaultHeaders` are replaced or removed, each protected name appearing once |
+| 4 | `TransportTest.zeroMaxRetriesDisablesRetrying` | client `maxRetries = 0` → one attempt |
+| 5 | `TransportTest.anAlreadyCancelledScopeNeverReachesTheEngine` | a cancelled `Job` in context → zero engine requests |
+| 6 | `ClientTest.anEmpty200BodyFailsLoudlyInsteadOfReadingAsAnEmptyResult` | `""` as a 200 body fails naming the body, and `models` for `list()` — never an empty answer map |
+| 7 | `ClientTest.rateLimitHasNoRetryAfterWhenTheServerSentNone` | absent header → `null`, not a sentinel `0` |
+| 8 | `WireTransportTest.aBodyThatStallsAfterA200TimesOutOnEveryConsumerPath` | now asserts 3 recorded requests: one timeout budget per attempt |
+| 9 | `ClientTest.aJsonNullStateIsSentRatherThanDropped` | a `JsonNull` state is sent as `"state":null`, so the key is never dropped |
+| 3 | **not ported** | already pinned — the shared transport helper passes a trailing-slash `baseUrl` and `buildsTheRequestFromTheBaseUrlAndThePath` asserts the joined URL; the env-sourced base URL reaches the same `resolveSetting`, now covered through `client.baseUrl` as well |
+
+**B — the unpinned-mutant clusters**, and the delta. `./gradlew pitestJvm`, same task and config, before and after:
+
+| | generated | covered | detected | survived | test strength |
+|---|---|---|---|---|---|
+| before | 762 | 729 | 544 | 185 | **74.6%** |
+| after | 767 | 735 | 596 | 139 | **81.1%** |
+
+Survivors per file, before → after: `ErrorMapping.kt` 39 → 22, `Client.kt` 33 → 19, `Answers.kt` 20 → 8,
+`Config.kt` 8 → 6. Ported: `ErrorMappingTest.aWrongJsonTypeOnAMessageFieldFallsBackToTheRawText` and
+`extractsTheFastApiValidationEntriesAndTheirFieldPaths`, `ClientTest.decodeRejectsAnAnswersFieldThatIsNotAnObject`,
+`decodeTreatsAWrongJsonTypeOnModelAndUsageAsAbsent` and the `APITimeoutError`-is-not-`APIConnectionError` assertion,
+`AnswerDecodingTest.aKnownAnswerFieldWithTheWrongJsonTypeFailsNamingTheFieldPath` (eleven shapes).
+**Left behind, with reasons:** `ErrorMapping.asPublicError`'s `message ?: "…"` elvis fallbacks are unreachable
+(every `TransportException` carries a message); the `errorFor` `in 500..599` and `parseBody`/`extractErrorMessage`
+length boundaries are off-by-one mutants whose contract is already covered; the `random`/`platformEnv` default
+parameters are injection seams; the remaining `Answers`/`Client` `EQUAL_ELSE` survivors are the negative branch of
+a wrong-type case the positive cases already exercise; `ResultKt.throwOnFailure` and `Intrinsics` survivors are
+bucket M (mechanical) in `research/22-mutation-testing-evaluation.md`.
+
+**C — deliberately not ported** (recorded, not built): mutable caller collections — Kotlin's `Set`/`Map` are
+read-only *by type*, so JS's defensive copy is unnecessary and a hostile cast is not a supported path; and
+`ModelCard`'s dropped unknown fields — the siblings disagree with each other on the shape and the drop is already
+pinned by `modelsListReturnsTheCardsAndIgnoresExtraFields`.
+
+**D — the KDoc fence is now compiled.** `generateReadmeSnippets` became `generateDocSnippets`: the same fence
+regex against one more input (`src/**/*.kt`). A KDoc body keeps its leading ` * `, which is stripped before the
+block is compiled; its snippets are generated into the SDK's own package as `kdocSnippetN(client: TypeSafeClient)`,
+because the snippet documents a call on a client the reader already has, while README snippets keep the `.docs`
+package and their no-argument wrappers. The existing README non-vacuity check is untouched. Watched it fail for
+the right reason: changing `client.systemOne` to `client.systemTwo` inside `Questions.kt`'s fence makes
+`compileTestKotlinJvm` fail with `Unresolved reference 'systemTwo'`. That is ~40 lines of build script — more than
+"a few", so reporting the cost rather than claiming otherwise; it is one regex applied to a second input plus two
+small helpers, not a doc-test framework.
+
+**E — the six resolved settings are built.** `TypeSafeClient` gains read-only `baseUrl`, `defaultModel`,
+`timeout`, `retry`, `logLevel` and `defaultHeaders`, each the *effective* value with the resolution order stated
+once in the interface KDoc. `ResolvedConfig` now carries `retry` and `defaultHeaders` so the client and the
+transport read the same object, and the API key has no accessor (it stays in the transport only). `apiDump` adds
+exactly those six. Tests: `resolvedSettingsReportWhatTookEffectAfterEnvAndDefaults` asserts default/env/explicit
+for the three env-movable values, `resolvedRetryTimeoutAndHeadersReportTheEffectiveValues` asserts the default
+policy when none was passed plus one assertion each for `timeout` and `defaultHeaders`. README parity bullet added.
+
+**Deliberate deviation in the CHANGELOG.** The change is user-visible, but there is no `## [Unreleased]` section
+and `checkVersion` requires the top heading to name `0.1.0` while `gradle.properties` is not a SNAPSHOT, so the
+bullet went under the existing `0.1.0` heading instead of a new Unreleased one that would fail the gate.
+
+**A divergence found while porting — reported, not fixed.** `ErrorMapping.validationEntry` builds the FastAPI
+`loc` path with `mapNotNull { it.asStringOrNull() }`, so an **integer `loc` segment is dropped**:
+`["body","questions",0]` extracts `questions`, while Python's `src/typesafe_sdk/_core/errors.py:62` does
+`str(item) for item in location` and yields `questions.0`. Ours also drops only a leading run of `body`
+(`dropWhile`) where Python drops it anywhere (`filter`). I did not assert the integer shape (it fails) and did not
+change `validationEntry`: our behaviour differs from the sibling in a user-visible error message, which this
+ticket calls a decision, so the case is left unpinned and this paragraph is the record. A later ticket should
+decide whether the path stringifies non-string segments to match Python.
+
+**Files.** `src/commonMain/.../Client.kt`, `Config.kt`; `src/commonTest/.../ClientTest.kt`, `TransportTest.kt`,
+`ErrorMappingTest.kt`, `AnswerDecodingTest.kt`; `src/jvmTest/.../WireTransportTest.kt`; `build.gradle.kts`;
+`api/jvm/jev-kmp.api`; `README.md`; `CHANGELOG.md`.
+
+**Gate.** `./gradlew check` → BUILD SUCCESSFUL (last run 25 s): ktlint, `apiCheck`, `checkVersion`,
+`checkJvmBytecode`, `dokkaGenerate` (the KDoc gate), `koverVerify`, and the JVM + Android + `iosSimulatorArm64` +
+`macosArm64` tests. `linuxX64Test` is SKIPPED on this macOS host by design (the Linux lane runs it) and `iosX64`
+is compile-only, so the new `commonTest` cases were executed on four targets here.
