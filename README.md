@@ -184,8 +184,9 @@ secret.
 
 PIT mutates the JVM compilation of `commonMain` and writes `build/reports/pitest/` (read `mutations.xml`; the
 HTML report mis-attributes line numbers for inlined Kotlin). It re-runs the suite once per mutant and takes
-about two minutes, so it is deliberately **not** part of `check`. The measured baseline, what it says about the
-line-coverage floor, and how to read the survivors are in
+about two minutes, so it is deliberately **not** part of `check`; [`docs/releasing.md`](docs/releasing.md) says
+when to run it and how to read the result. The measured baseline, what it says about the line-coverage floor,
+and how to read the survivors are in
 [`.scratch/jev-kmp-sdk/research/22-mutation-testing-evaluation.md`](.scratch/jev-kmp-sdk/research/22-mutation-testing-evaluation.md).
 
 ## Documentation

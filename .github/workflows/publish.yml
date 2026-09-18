@@ -27,6 +27,13 @@ jobs:
       # Refuse to publish a version the changelog does not describe.
       - run: ./gradlew checkVersion
 
+      # The release-time mutation run, and deliberately non-gating: mutation testing has no threshold that
+      # means anything at this size (one mutant is 0.14pp, repeat runs flip 0.8%), and a release must not fail
+      # on a measurement. A tag push is the only moment anyone releases, so the strength and survivor count land
+      # in this run's log either way. How to read them: docs/releasing.md.
+      - run: ./gradlew pitestJvm
+        continue-on-error: true
+
       # Signing and the namespace verification are one-time human prerequisites; this workflow is the shape,
       # and it is expected to fail until those exist.
       - run: ./gradlew publishToMavenCentral
