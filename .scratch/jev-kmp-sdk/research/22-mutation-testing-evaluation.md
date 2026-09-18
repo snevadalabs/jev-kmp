@@ -651,6 +651,12 @@ reproduces ticket 22's 0.8 % figure as *named* mutants, and it sets three constr
 3. Only a difference well above ~6 mutants means anything. The 139 → 122 filter result does. The
    82.5 % → 83.0 % strength move does not.
 
+One test-level flake was observed while adding the tests below, and is consistent with the mutant flips rather
+than separate from them: `WireTransportTest.aConnectionDroppedMidBodyIsRetriedAndTheFinalCauseSurvives` — which
+asserts `3 == server.recordedRequests.size` over a real socket — failed once, then passed 10 consecutive times
+(4 with the new tests present, 6 with them stashed). A timing-sensitive test that asserts a retry *count* is a
+plausible contributor to the retried-condition mutants flipping, though this run did not attribute them.
+
 ### Baseline ledger: mechanically sound, deliberately not adopted
 
 A 30-line prototype was built and proven against four cases. Its key is PIT's own identity tuple —
@@ -679,3 +685,21 @@ The arcmutate Kotlin plugin was considered and **declined**: it is the one tool 
 compiler-generated null handling properly (default = compiler-generated subsets, `+KOTLIN_NO_NULLS` = all,
 including hand-rolled), which is the largest remaining survivor family here, but it is a paid licence and would
 put a third party's artefact on the path of a release-time check.
+
+### The three normal-path survivors are now pinned
+
+Survivor analysis separated 139 mutants into buckets by whether a user could hit them without the server doing
+anything unusual. Three could, and each now has a test that fails when its mutant is applied:
+
+| survivor | test |
+|---|---|
+| `Transport.close` losing `http.close()` | `TransportTest.aClosedTransportNeverReachesTheEngineAgain` |
+| `RetryPolicy.getApiConnectionError` pinned to `true` | `TransportTest.classifiesConnectionFailuresSeparatelyAndHonoursApiConnectionError` |
+| `toWireJson` encoding every choice description as `JsonNull` | `QuestionModelTest.choiceCriteriaReachTheWireWithTheDescriptionEachOptionCarries` |
+
+Each was verified **by applying the mutant by hand and watching its test fail**, one at a time — not by a pitest
+re-run, because a 3-mutant change sits well inside the ±6 noise floor above and a run could not have confirmed it.
+
+The close guard is behavioural rather than structural: the leak that closing the Ktor client prevents (threads, a
+connection pool) has no local observable when the engine is caller-owned, so the test pins the consequence — a
+closed transport never reaches the engine again, while a new transport over the same engine still works.

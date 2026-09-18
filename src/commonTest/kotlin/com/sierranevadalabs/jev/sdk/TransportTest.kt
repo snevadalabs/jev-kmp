@@ -280,6 +280,32 @@ class TransportTest {
         }
 
     @Test
+    fun classifiesConnectionFailuresSeparatelyAndHonoursApiConnectionError() =
+        runTest {
+            var attempts = 0
+            val engine =
+                MockEngine {
+                    attempts++
+                    throw IOException("connect refused")
+                }
+
+            val retrying = transport(engine)
+            assertIs<TransportException.Connection>(
+                runCatching { retrying.request(HttpMethod.Get, "/v1/models") }.exceptionOrNull(),
+            )
+            assertEquals(3, attempts, "apiConnectionError defaults to true")
+            retrying.close()
+
+            attempts = 0
+            val notRetrying = transport(engine, retryPolicy = RetryPolicy(apiConnectionError = false))
+            assertIs<TransportException.Connection>(
+                runCatching { notRetrying.request(HttpMethod.Get, "/v1/models") }.exceptionOrNull(),
+            )
+            assertEquals(1, attempts)
+            notRetrying.close()
+        }
+
+    @Test
     fun classifiesTimeoutsSeparatelyAndHonoursApiTimeoutError() =
         runTest {
             var attempts = 0
@@ -491,6 +517,27 @@ class TransportTest {
             val second = transport(engine)
             assertEquals(200, second.request(HttpMethod.Get, "/v1/models").status)
             second.close()
+        }
+
+    @Test
+    fun aClosedTransportNeverReachesTheEngineAgain() =
+        runTest {
+            var attempts = 0
+            val engine =
+                MockEngine {
+                    attempts++
+                    respond("""{"ok":true}""")
+                }
+            val transport = transport(engine)
+            assertEquals(200, transport.request(HttpMethod.Get, "/v1/models").status)
+
+            transport.close()
+            runCatching { transport.request(HttpMethod.Get, "/v1/models") }
+
+            // The leak that closing the Ktor client prevents (threads, connection pool) has no local
+            // observable, so the guard is behavioural: a closed transport must not reach the engine. Delete
+            // `http.close()` from `Transport.close` and this count becomes 2.
+            assertEquals(1, attempts)
         }
 
     private suspend fun delaysFor(retryAfter: Headers): List<Long> {

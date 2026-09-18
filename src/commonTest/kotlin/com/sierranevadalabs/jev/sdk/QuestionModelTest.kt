@@ -3,6 +3,7 @@ package com.sierranevadalabs.jev.sdk
 import com.sierranevadalabs.jev.sdk.conformance.loadConformanceCases
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -57,6 +58,24 @@ class QuestionModelTest {
                 put("criteria", buildJsonObject { put("false", "routine") })
             },
             noOnly.toWireJson(),
+        )
+    }
+
+    @Test
+    fun choiceCriteriaReachTheWireWithTheDescriptionEachOptionCarries() {
+        assertEquals(
+            buildJsonObject {
+                put("type", "choice")
+                put("instructions", "Which?")
+                put(
+                    "criteria",
+                    buildJsonObject {
+                        put("a", JsonNull)
+                        put("b", "second")
+                    },
+                )
+            },
+            choice("category", "Which?", mapOf("a" to null, "b" to "second")).toWireJson(),
         )
     }
 
