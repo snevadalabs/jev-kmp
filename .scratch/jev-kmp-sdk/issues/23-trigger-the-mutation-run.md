@@ -1,7 +1,7 @@
 # Give the on-demand mutation run a trigger, at release time
 
 Type: task
-Status: open
+Status: claimed
 Blocked by:
 
 ## Question
