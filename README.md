@@ -1,12 +1,18 @@
 # jev-kmp
 
-Kotlin Multiplatform SDK for the TypeSafe / Jev System One API. Jev answers typed questions about a state:
-whether something is true (`noul`), which of a set of options it is (`choice`), and where it falls on an ordered
-scale (`score`) — with calibrated probabilities rather than generated text. Learn what TypeSafe can do in the
-[TypeSafe docs](https://docs.typesafe.ai/).
+[![status: unreleased](https://img.shields.io/badge/status-unreleased-lightgrey.svg)](CHANGELOG.md)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+Kotlin Multiplatform SDK for the TypeSafe / Jev System One API — **typed questions with calibrated
+probabilities instead of generated text.**
+
+Jev answers typed questions about a state: whether something is true (`noul`), which of a set of options it is
+(`choice`), and where it falls on an ordered scale (`score`) — with calibrated probabilities rather than
+generated text. Learn what TypeSafe can do in the [TypeSafe docs](https://docs.typesafe.ai/). Every Kotlin
+example in this file is compiled by the test suite, so it cannot drift from the API.
 
 > **Status: unreleased.** `0.1.0` is under construction. The public API is not yet stable and no artifact has
-> been published, so the coordinates above are what `0.1.0` will publish, not something to depend on today.
+> been published, so the coordinates below are what `0.1.0` will publish, not something to depend on today.
 
 | | |
 |---|---|
@@ -14,6 +20,25 @@ scale (`score`) — with calibrated probabilities rather than generated text. Le
 | Package | `com.sierranevadalabs.jev.sdk` |
 | Targets | JVM, Android, Apple (iOS `arm64`/`simulatorArm64`/`x64`, macOS `arm64`), Linux `x64` |
 | License | MIT |
+
+## Requirements
+
+- Kotlin `2.3.21` — the exact version Ktor 3.5.2 builds and publishes against, and the version this module's
+  metadata is compiled with
+- JVM: consumes Java 8 bytecode; building from source needs JDK 21
+- Android: `minSdk 28` (`compileSdk 36`)
+- Ktor and `kotlinx-serialization` arrive transitively; nothing else needs declaring
+
+## Table of Contents
+
+- [Quickstart](#quickstart)
+- [Parity and differences from the Python and JavaScript SDKs](#parity-and-differences-from-the-python-and-javascript-sdks)
+- [Error handling](#error-handling)
+- [Running the tests](#running-the-tests)
+- [Documentation](#documentation)
+- [Compatibility](#compatibility)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Quickstart
 
@@ -204,3 +229,13 @@ See [`CONTEXT.md`](CONTEXT.md) for the vocabulary this project uses for the API 
 The public API dump under `api/` is committed and compared on every build. Until `0.1.0` is tagged it is a review
 gate rather than a promise: any public-surface change must show up as a deliberate, reviewed diff rather than a
 silent `apiDump`. From the first tag onward it is the published baseline.
+
+## Contributing
+
+Issues and pull requests are welcome. Run `./gradlew check` before opening one — see
+[Running the tests](#running-the-tests) for what it covers and how to run the opt-in live tier. Questions go to
+[GitHub Issues](https://github.com/snevadalabs/jev-kmp/issues).
+
+## License
+
+MIT © Sierra Nevada Labs. See [LICENSE](LICENSE).
