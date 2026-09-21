@@ -106,11 +106,11 @@ public class InternalServerError internal constructor(
  * The response body could not be decoded — a `200` whose payload does not match the wire contract, not a
  * client-side programming error.
  *
- * @property field the dotted path of the offending field (`answers.urgent.noul`), or `null` when the whole
- *   body was unusable. Python's SDK calls this `field_path`.
+ * @property fieldPath the dotted path of the offending field (`answers.urgent.noul`), or `null` when the whole
+ *   body was unusable. Python's SDK names it `field_path`.
  */
 public class APIResponseValidationError internal constructor(
-    public val field: String?,
+    public val fieldPath: String?,
     status: Int,
     body: JsonElement?,
     requestId: String?,

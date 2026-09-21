@@ -37,8 +37,8 @@ public final class com/sierranevadalabs/jev/sdk/ChoiceQuestion : com/sierranevad
 
 public final class com/sierranevadalabs/jev/sdk/ClientKt {
 	public static final fun TypeSafeClient (Lcom/sierranevadalabs/jev/sdk/TypeSafeConfig;)Lcom/sierranevadalabs/jev/sdk/TypeSafeClient;
-	public static final fun systemOne-Zzr-CC0 (Lcom/sierranevadalabs/jev/sdk/TypeSafeClient;Ljava/lang/String;[Lcom/sierranevadalabs/jev/sdk/Question;Ljava/lang/String;Lkotlin/time/Duration;Lcom/sierranevadalabs/jev/sdk/RetryPolicy;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun systemOne-Zzr-CC0$default (Lcom/sierranevadalabs/jev/sdk/TypeSafeClient;Ljava/lang/String;[Lcom/sierranevadalabs/jev/sdk/Question;Ljava/lang/String;Lkotlin/time/Duration;Lcom/sierranevadalabs/jev/sdk/RetryPolicy;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun systemOne-dp_umgU (Lcom/sierranevadalabs/jev/sdk/TypeSafeClient;Ljava/lang/String;[Lcom/sierranevadalabs/jev/sdk/Question;Ljava/lang/String;Lkotlin/time/Duration;Lcom/sierranevadalabs/jev/sdk/RetryPolicy;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun systemOne-dp_umgU$default (Lcom/sierranevadalabs/jev/sdk/TypeSafeClient;Ljava/lang/String;[Lcom/sierranevadalabs/jev/sdk/Question;Ljava/lang/String;Lkotlin/time/Duration;Lcom/sierranevadalabs/jev/sdk/RetryPolicy;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class com/sierranevadalabs/jev/sdk/HeadersKt {
@@ -73,11 +73,12 @@ public final class com/sierranevadalabs/jev/sdk/ModelCard {
 }
 
 public abstract interface class com/sierranevadalabs/jev/sdk/Models {
-	public abstract fun list-k1IrOU0 (Lkotlin/time/Duration;Lcom/sierranevadalabs/jev/sdk/RetryPolicy;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun list-5EIzBIU (Lkotlin/time/Duration;Lcom/sierranevadalabs/jev/sdk/RetryPolicy;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun list-5EIzBIU$default (Lcom/sierranevadalabs/jev/sdk/Models;Lkotlin/time/Duration;Lcom/sierranevadalabs/jev/sdk/RetryPolicy;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class com/sierranevadalabs/jev/sdk/Models$DefaultImpls {
-	public static synthetic fun list-k1IrOU0$default (Lcom/sierranevadalabs/jev/sdk/Models;Lkotlin/time/Duration;Lcom/sierranevadalabs/jev/sdk/RetryPolicy;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun list-5EIzBIU$default (Lcom/sierranevadalabs/jev/sdk/Models;Lkotlin/time/Duration;Lcom/sierranevadalabs/jev/sdk/RetryPolicy;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class com/sierranevadalabs/jev/sdk/NoulAnswer : com/sierranevadalabs/jev/sdk/Answer {
@@ -219,11 +220,12 @@ public abstract interface class com/sierranevadalabs/jev/sdk/TypeSafeClient : ja
 	public abstract fun getModels ()Lcom/sierranevadalabs/jev/sdk/Models;
 	public abstract fun getRetry ()Lcom/sierranevadalabs/jev/sdk/RetryPolicy;
 	public abstract fun getTimeout-UwyO8pc ()J
-	public abstract fun systemOne-FHKeTTw (Lkotlinx/serialization/json/JsonElement;[Lcom/sierranevadalabs/jev/sdk/Question;Ljava/lang/String;Lkotlin/time/Duration;Lcom/sierranevadalabs/jev/sdk/RetryPolicy;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun systemOne-Tnuy9kA (Lkotlinx/serialization/json/JsonElement;[Lcom/sierranevadalabs/jev/sdk/Question;Ljava/lang/String;Lkotlin/time/Duration;Lcom/sierranevadalabs/jev/sdk/RetryPolicy;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun systemOne-Tnuy9kA$default (Lcom/sierranevadalabs/jev/sdk/TypeSafeClient;Lkotlinx/serialization/json/JsonElement;[Lcom/sierranevadalabs/jev/sdk/Question;Ljava/lang/String;Lkotlin/time/Duration;Lcom/sierranevadalabs/jev/sdk/RetryPolicy;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class com/sierranevadalabs/jev/sdk/TypeSafeClient$DefaultImpls {
-	public static synthetic fun systemOne-FHKeTTw$default (Lcom/sierranevadalabs/jev/sdk/TypeSafeClient;Lkotlinx/serialization/json/JsonElement;[Lcom/sierranevadalabs/jev/sdk/Question;Ljava/lang/String;Lkotlin/time/Duration;Lcom/sierranevadalabs/jev/sdk/RetryPolicy;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun systemOne-Tnuy9kA$default (Lcom/sierranevadalabs/jev/sdk/TypeSafeClient;Lkotlinx/serialization/json/JsonElement;[Lcom/sierranevadalabs/jev/sdk/Question;Ljava/lang/String;Lkotlin/time/Duration;Lcom/sierranevadalabs/jev/sdk/RetryPolicy;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class com/sierranevadalabs/jev/sdk/TypeSafeConfig {
@@ -279,7 +281,7 @@ public class com/sierranevadalabs/jev/sdk/errors/APIError : com/sierranevadalabs
 }
 
 public final class com/sierranevadalabs/jev/sdk/errors/APIResponseValidationError : com/sierranevadalabs/jev/sdk/errors/APIError {
-	public final fun getField ()Ljava/lang/String;
+	public final fun getFieldPath ()Ljava/lang/String;
 }
 
 public final class com/sierranevadalabs/jev/sdk/errors/APITimeoutError : com/sierranevadalabs/jev/sdk/errors/APIConnectionError {

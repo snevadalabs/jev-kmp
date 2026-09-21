@@ -17,6 +17,8 @@ public interface Models {
      *   default. Exactly as on [TypeSafeClient.systemOne].
      * @param retry the retry policy for this call, or `null` for the client's configured default. Exactly as
      *   on [TypeSafeClient.systemOne].
+     * @param headers extra headers for this call, or `null` for none. Exactly as on
+     *   [TypeSafeClient.systemOne].
      * @throws com.sierranevadalabs.jev.sdk.errors.APIResponseValidationError if a 200 body is not
      *   `{ models: [...] }` with a string `name` on every entry — a server-side contract break, not a caller
      *   error.
@@ -26,6 +28,7 @@ public interface Models {
     public suspend fun list(
         timeout: Duration? = null,
         retry: RetryPolicy? = null,
+        headers: Map<String, String>? = null,
     ): List<ModelCard>
 }
 
@@ -62,18 +65,19 @@ public data class Usage(
  * closure returns.
  */
 internal class ModelsApi(
-    private val fetch: suspend (Duration?, RetryPolicy?) -> TransportResponse,
+    private val fetch: suspend (Duration?, RetryPolicy?, Map<String, String>?) -> TransportResponse,
 ) : Models {
     override suspend fun list(
         timeout: Duration?,
         retry: RetryPolicy?,
+        headers: Map<String, String>?,
     ): List<ModelCard> {
-        val response = fetch(timeout, retry)
+        val response = fetch(timeout, retry, headers)
         val payload = parseBody(response.body) as? JsonObject
         val models = payload?.get("models") as? JsonArray
         if (models == null) {
             throw APIResponseValidationError(
-                field = "models",
+                fieldPath = "models",
                 status = response.status,
                 body = parseBody(response.body),
                 requestId = response.requestId,
@@ -93,7 +97,7 @@ private fun decodeModelCard(
     val name = (card?.get("name") as? JsonPrimitive)?.takeIf { it.isString }?.content
     if (card == null || name == null) {
         throw APIResponseValidationError(
-            field = "models.$index.name",
+            fieldPath = "models.$index.name",
             status = response.status,
             body = parseBody(response.body),
             requestId = response.requestId,

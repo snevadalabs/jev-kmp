@@ -204,10 +204,14 @@ kotlin {
     // whole template. JVM and Android cannot share an intermediate source set.
 
     compilerOptions {
-        // Consumer reach: JVM consumers on Kotlin 2.0.x+, other platforms on 2.1+. Deliberately below the
-        // compiler's own 2.3 so we never gate consumers on a language version we do not need.
-        languageVersion = KotlinVersion.KOTLIN_2_1
-        apiVersion = KotlinVersion.KOTLIN_2_1
+        // The consumer floor is Kotlin 2.3, and the dependency chain sets it, not this pin: Ktor 3.5.2 and
+        // kotlinx-serialization 1.11.0 ship KLIB ABI 2.3.0 and JVM metadata 2.3.0. The KLIB ABI is
+        // one-directional, so no consumer below 2.3 can resolve the native targets. Matching language and API
+        // version to that floor keeps one advertised number instead of claiming reach the artifact lacks.
+        // JVM metadata one language version ahead is readable, so JVM consumers on 2.2.x+ work.
+        // `verifyConsumerFloor` fails if a toolchain move changes either floor.
+        languageVersion = KotlinVersion.KOTLIN_2_3
+        apiVersion = KotlinVersion.KOTLIN_2_3
         explicitApi = ExplicitApiMode.Strict
     }
 
@@ -361,10 +365,172 @@ val checkJvmBytecode by tasks.registering {
     }
 }
 
+// The advertised Kotlin consumer floor. The dependency chain sets it, not this module: Ktor 3.5.2 and
+// kotlinx-serialization 1.11.0 ship KLIB ABI 2.3.0 and JVM metadata 2.3.0. KLIB ABI compatibility is
+// one-directional, so no consumer below 2.3 can resolve the native targets. This task reads the built
+// artifacts rather than the DSL: a compiler or language-version move changes the stamp and fails the check
+// until the floor, the README and the build comment are updated on purpose.
+val kotlinFloor = "2.3"
+val jvmOnlyFloor = "2.2"
+
+val verifyConsumerFloor by tasks.registering {
+    group = "verification"
+    description = "Asserts the built artifacts still declare the advertised Kotlin consumer floor ($kotlinFloor)."
+
+    val classesDir = layout.buildDirectory.dir("classes/kotlin/jvm/main")
+
+    // The commonMain metadata klib is host-neutral, unlike an Apple klib, so every host can read the KLIB ABI.
+    val metadataManifest = layout.buildDirectory.file("classes/kotlin/metadata/commonMain/default/manifest")
+    dependsOn("compileKotlinJvm", "compileCommonMainKotlinMetadata")
+    inputs.dir(classesDir)
+    inputs.file(metadataManifest)
+    inputs.property("floor", kotlinFloor)
+
+    doLast {
+        // The JVM metadata version equals the language version; a consumer reads one version ahead of it.
+        val classFile =
+            classesDir
+                .get()
+                .asFile
+                .walkTopDown()
+                .firstOrNull { it.name == "SystemOneResponse.class" }
+                ?: error("no compiled SystemOneResponse.class under $classesDir")
+        val javapName = if (System.getProperty("os.name").startsWith("Win")) "javap.exe" else "javap"
+        val javap = File(System.getProperty("java.home"), "bin/$javapName")
+        val process =
+            ProcessBuilder(javap.absolutePath, "-v", "-p", classFile.absolutePath)
+                .redirectErrorStream(true)
+                .start()
+        val output = process.inputStream.bufferedReader().use { it.readText() }
+        check(process.waitFor() == 0) { "${javap.absolutePath} failed on $classFile:\n$output" }
+        val jvmVersion =
+            Regex("""mv=\[(\d+),(\d+)""")
+                .find(output)
+                ?.let { "${it.groupValues[1]}.${it.groupValues[2]}" }
+                ?: error("no kotlin.Metadata mv in $classFile")
+        check(jvmVersion == kotlinFloor) {
+            "JVM metadata is $jvmVersion, expected $kotlinFloor. The language version moved, so JVM " +
+                "consumers on $jvmOnlyFloor.x would stop reading the artifact. Update the floor deliberately."
+        }
+
+        // The KLIB ABI comes from the compiler, not the language version, and it is one-directional.
+        val abi =
+            Regex("""(?m)^abi_version=(.+)$""")
+                .find(metadataManifest.get().asFile.readText())
+                ?.groupValues
+                ?.get(1)
+                ?.trim()
+                ?: error("no abi_version in $metadataManifest")
+        val abiVersion = abi.split(".").take(2).joinToString(".")
+        check(abiVersion == kotlinFloor) {
+            "KLIB ABI is $abi, expected $kotlinFloor. The compiler moved, so no consumer below " +
+                "$abiVersion can resolve the native targets. Update the floor deliberately."
+        }
+        logger.lifecycle("Kotlin consumer floor $kotlinFloor (JVM-only $jvmOnlyFloor): JVM metadata $jvmVersion, KLIB ABI $abi")
+    }
+}
+
 tasks.named("check") {
-    // The coverage floor and the KDoc gate are part of the check, not reports someone remembers to open.
-    // `dokkaGenerate` is host-neutral here: it compiles Kotlin metadata only, never an Apple klib.
-    dependsOn(checkVersion, checkJvmBytecode, "koverVerify", "dokkaGenerate")
+    // The coverage floor, the KDoc gate and the consumer-floor guard are part of the check, not reports
+    // someone remembers to open. `dokkaGenerate` is host-neutral here: it compiles Kotlin metadata only,
+    // never an Apple klib.
+    dependsOn(checkVersion, checkJvmBytecode, "koverVerify", "dokkaGenerate", verifyConsumerFloor)
+}
+
+// Opt-in empirical proof of the JVM floor above. `verifyConsumerFloor` reads the artifact stamp; this task
+// compiles a tiny consumer with older compilers in a subprocess, so an old compiler never loads into the
+// Gradle daemon. A consumer reads JVM metadata one language version ahead, so Kotlin 2.2 must compile the
+// consumer and Kotlin 2.1 must reject it. It downloads two compilers, so it is not part of `check`.
+val consumerProofCases = listOf("2.2.21" to true, "2.1.21" to false)
+
+val consumerProofCompilers: Map<String, Configuration> =
+    consumerProofCases.associate { (version, _) ->
+        val name = "consumerProofCompiler${version.replace(".", "")}"
+        configurations.create(name) {
+            isCanBeConsumed = false
+            isCanBeResolved = true
+            description = "The Kotlin $version compiler that proves the JVM consumer floor."
+        }
+        dependencies.add(name, "org.jetbrains.kotlin:kotlin-compiler-embeddable:$version")
+        version to configurations.getByName(name)
+    }
+
+val verifyConsumerJvmFloor by tasks.registering {
+    group = "verification"
+    description = "Compiles a tiny consumer with Kotlin 2.2 (must pass) and Kotlin 2.1 (must fail)."
+
+    val jvmMain =
+        kotlin.targets
+            .getByName("jvm")
+            .compilations
+            .getByName("main")
+    val consumerClasspath = files(jvmMain.output.classesDirs, jvmMain.compileDependencyFiles)
+    val workDir = layout.buildDirectory.dir("consumer-jvm-floor")
+
+    dependsOn("compileKotlinJvm")
+
+    doLast {
+        val dir = workDir.get().asFile
+        dir.deleteRecursively()
+        dir.mkdirs()
+        val source = File(dir, "Consumer.kt")
+        source.writeText(
+            """
+            import com.sierranevadalabs.jev.sdk.ChoiceAnswer
+            import com.sierranevadalabs.jev.sdk.TypeSafeClient
+            import com.sierranevadalabs.jev.sdk.TypeSafeConfig
+            import com.sierranevadalabs.jev.sdk.choice
+            import com.sierranevadalabs.jev.sdk.systemOne
+
+            suspend fun consumer(apiKey: String): String {
+                val client = TypeSafeClient(TypeSafeConfig(apiKey = apiKey))
+                val category =
+                    choice("category", "What is this about?", mapOf("billing" to null, "technical" to null))
+                client.use {
+                    val response = it.systemOne("I was charged twice.", category)
+                    val answer: ChoiceAnswer = response[category]
+                    return answer.choice
+                }
+            }
+            """.trimIndent() + "\n",
+        )
+
+        val java = File(System.getProperty("java.home"), "bin/java").absolutePath
+        consumerProofCases.forEach { (version, mustPass) ->
+            val compilerJars =
+                consumerProofCompilers
+                    .getValue(version)
+                    .files
+                    .joinToString(File.pathSeparator) { it.absolutePath }
+            val builder =
+                ProcessBuilder(
+                    java,
+                    "-cp",
+                    compilerJars,
+                    "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler",
+                    "-no-stdlib",
+                    "-classpath",
+                    consumerClasspath.asPath,
+                    "-d",
+                    File(dir, "out-$version").absolutePath,
+                    source.absolutePath,
+                )
+            val process = builder.redirectErrorStream(true).start()
+            val output = process.inputStream.bufferedReader().use { it.readText() }
+            val exit = process.waitFor()
+            if (mustPass) {
+                check(exit == 0) { "Kotlin $version must compile a consumer of this artifact but failed:\n$output" }
+                logger.lifecycle("consumer compiled on Kotlin $version, as expected")
+            } else {
+                check(exit != 0) { "Kotlin $version compiled a consumer of this artifact: the JVM floor is too low." }
+                check(output.contains("incompatible version of Kotlin")) {
+                    "Kotlin $version failed for a reason other than the metadata version:\n$output"
+                }
+                val rejection = output.lineSequence().firstOrNull { it.contains("error:") }?.trim() ?: output.trim()
+                logger.lifecycle("consumer rejected on Kotlin $version, as expected: $rejection")
+            }
+        }
+    }
 }
 
 // The live tier is opt-in through this property; a default `check` can never reach the network or spend money.

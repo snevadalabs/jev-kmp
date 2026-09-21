@@ -273,8 +273,8 @@ class TransportTest {
             val failure = runCatching { transport.request(HttpMethod.Get, "/v1/models") }.exceptionOrNull()
 
             assertIs<TransportException.Connection>(failure)
-            assertIs<IOException>(failure?.cause)
-            assertEquals("fail-3", failure?.cause?.message)
+            assertIs<IOException>(failure.cause)
+            assertEquals("fail-3", failure.cause?.message)
             assertNull(engine.requestHistory.firstOrNull(), "a throwing handler records no request history")
             transport.close()
         }

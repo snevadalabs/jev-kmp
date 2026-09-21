@@ -251,7 +251,7 @@ class ClientTest {
             val failure = runCatching { client(engine).systemOne("hello", noul("urgent", "?")) }.exceptionOrNull()
 
             val validation = assertIs<APIResponseValidationError>(failure)
-            assertEquals("answers.urgent.noul", validation.field)
+            assertEquals("answers.urgent.noul", validation.fieldPath)
             assertEquals("answers.urgent.noul: expected a numeric field 'noul'", validation.message)
             assertEquals(200, validation.status)
         }
@@ -273,7 +273,7 @@ class ClientTest {
                 val failure = runCatching { client(engine).systemOne("hello", noul("urgent", "?")) }.exceptionOrNull()
 
                 val validation = assertIs<APIResponseValidationError>(failure, body)
-                assertEquals("answers", validation.field)
+                assertEquals("answers", validation.fieldPath)
                 assertEquals("answers: expected an object field 'answers'", validation.message)
             }
         }
@@ -409,7 +409,7 @@ class ClientTest {
                 val failure = runCatching { client(engine).models.list() }.exceptionOrNull()
 
                 val validation = assertIs<APIResponseValidationError>(failure, "body: $body")
-                assertEquals("models", validation.field, "body: $body")
+                assertEquals("models", validation.fieldPath, "body: $body")
                 assertTrue(validation.message!!.contains("GET /v1/models"), validation.message)
                 assertTrue(validation.message!!.contains("expected { models: [...] }"), validation.message)
             }
@@ -441,7 +441,7 @@ class ClientTest {
                 val failure = runCatching { client(engine).models.list() }.exceptionOrNull()
 
                 val validation = assertIs<APIResponseValidationError>(failure, body)
-                assertEquals(field, validation.field, body)
+                assertEquals(field, validation.fieldPath, body)
                 assertEquals("GET /v1/models: $field: expected a string field 'name'", validation.message, body)
                 assertEquals(200, validation.status, body)
             }
@@ -477,7 +477,7 @@ class ClientTest {
                 val failure = runCatching { client(engine).systemOne("hello", noul("urgent", "?")) }.exceptionOrNull()
 
                 val validation = assertIs<APIResponseValidationError>(failure, body)
-                assertNull(validation.field, body)
+                assertNull(validation.fieldPath, body)
                 assertEquals("expected a JSON object response body", validation.message, body)
                 assertEquals(200, validation.status, body)
             }
@@ -530,12 +530,12 @@ class ClientTest {
 
             val validation = assertIs<APIResponseValidationError>(failure)
             assertEquals("expected a JSON object response body", validation.message)
-            assertNull(validation.field, "there is no answer field to name")
+            assertNull(validation.fieldPath, "there is no answer field to name")
             assertEquals(200, validation.status)
 
             val modelsFailure = runCatching { client(engine).models.list() }.exceptionOrNull()
             val modelsValidation = assertIs<APIResponseValidationError>(modelsFailure)
-            assertEquals("models", modelsValidation.field)
+            assertEquals("models", modelsValidation.fieldPath)
             assertTrue(modelsValidation.message!!.contains("GET /v1/models"), modelsValidation.message)
         }
 
@@ -656,6 +656,40 @@ class ClientTest {
             assertEquals(RetryPolicy(maxRetries = 7), configured.retry)
             assertEquals(250.milliseconds, configured.timeout)
             assertEquals(mapOf("X-Team" to "sdk"), configured.defaultHeaders)
+        }
+
+    @Test
+    fun threadsPerCallHeadersFromThePublicApiToTheWire() =
+        runTest {
+            // Both siblings take per-call headers (`extra_headers` in Python, `RequestOptions.headers` in
+            // JavaScript). The transport has merged them since the start, but the public surface could not
+            // reach it, so this pins the new plumbing on both resources and the names that still win.
+            val engine =
+                MockEngine { request ->
+                    when (request.url.encodedPath) {
+                        "/v1/models" -> respond("""{"models":[]}""")
+                        else ->
+                            respond(
+                                """{"model":"jev-latest","answers":{"urgent":{"type":"noul","noul":1.0}}}""",
+                            )
+                    }
+                }
+            val client = client(engine)
+            val urgent = noul("urgent", "Does this convey urgency?")
+
+            client.systemOne(
+                "hello",
+                urgent,
+                headers = mapOf("X-Call" to "system-one", "Authorization" to "Bearer caller"),
+            )
+            client.models.list(headers = mapOf("X-Call" to "models", "x-typesafe-sdk" to "caller/9"))
+
+            val systemOneRequest = engine.requestHistory[0]
+            assertEquals("system-one", systemOneRequest.headers["X-Call"], "a per-call header reaches systemOne")
+            assertEquals("Bearer test-key", systemOneRequest.headers[AUTHORIZATION_HEADER], "the SDK's key still wins")
+            val listRequest = engine.requestHistory[1]
+            assertEquals("models", listRequest.headers["X-Call"], "a per-call header reaches the catalogue")
+            assertEquals("typesafe-sdk-kotlin/0.1.0", listRequest.headers[SDK_HEADER], "the SDK header still wins")
         }
 }
 

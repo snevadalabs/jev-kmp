@@ -159,7 +159,7 @@ internal suspend fun assertConformanceCase(case: FixtureCase) {
             }
             case.expect["field"]?.jsonPrimitive?.content?.let { field ->
                 val validation = error as? APIResponseValidationError ?: fail("${case.id}: '$declaredError' carries no field")
-                assertEquals(field, validation.field, "${case.id}: offending field")
+                assertEquals(field, validation.fieldPath, "${case.id}: offending field")
             }
         } else {
             assertEquals(null, failure, "${case.id}: expected success")

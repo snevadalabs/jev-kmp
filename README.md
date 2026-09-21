@@ -25,6 +25,8 @@ example in this file is compiled by the test suite, so it cannot drift from the 
 
 - Kotlin `2.3.21` — the exact version Ktor 3.5.2 builds and publishes against, and the version this module's
   metadata is compiled with
+- Consumers: Kotlin `2.3`+ for the multiplatform targets, or Kotlin `2.2`+ for the JVM target alone; see
+  [Compatibility](#compatibility)
 - JVM: consumes Java 8 bytecode; building from source needs JDK 21
 - Android: `minSdk 28` (`compileSdk 36`)
 - Ktor and `kotlinx-serialization` arrive transitively; nothing else needs declaring
@@ -132,10 +134,16 @@ status, duration and request id alone, so there is no redaction table that can b
       timeout = 30.seconds,
   )
 
-  // The model catalogue takes the same two per-call overrides.
+  // A call can add its own headers too, over the client's defaults and under the SDK's own.
+  client.systemOne("Retry me.", urgent, headers = mapOf("X-Request-Id" to "req-1"))
+
+  // The model catalogue takes the same per-call overrides.
   client.models.list(timeout = 30.seconds, retry = RetryPolicy(maxRetries = 0))
   ```
 
+- **Per-call headers are the siblings' `extra_headers` and `RequestOptions.headers`.** `systemOne` and
+  `models.list` take `headers = …`. They merge over `defaultHeaders` and under the SDK's own, so a caller cannot
+  replace `Authorization`, `Accept` or `Content-Type`.
 - **A `score` question needs at least two levels.** Fewer is rejected locally with an `IllegalArgumentException`
   instead of spending a `422`; both SDKs require it on the wire.
 - **The client reports its resolved settings.** `baseUrl`, `defaultModel`, `timeout`, `retry`, `logLevel` and
@@ -178,7 +186,8 @@ try {
 
 `APIError` carries `status`, `body` and `requestId`; its subclasses are `BadRequestError`,
 `AuthenticationError`, `PermissionDeniedError`, `NotFoundError`, `UnprocessableEntityError`, `RateLimitError`
-and `InternalServerError`. `APIResponseValidationError` is a 200 whose body did not match the wire contract.
+and `InternalServerError`. `APIResponseValidationError` is a 200 whose body did not match the wire contract. It
+names the offending field in `fieldPath`, the name the Python SDK uses.
 `APIConnectionError` — with `APITimeoutError` as its subclass — covers the failures where no response arrived,
 and they carry the engine's own failure as `cause`. A caller's cancellation is a `CancellationException` and is
 never wrapped.
@@ -215,6 +224,18 @@ HTML report mis-attributes line numbers for inlined Kotlin). It re-runs the suit
 about two minutes, so it is deliberately **not** part of `check`. Run it before a release; read the test
 strength it prints, then every survivor, because a surviving mutant is a behaviour no test observes.
 
+### Proving the JVM floor, on demand
+
+```bash
+./gradlew verifyConsumerJvmFloor
+```
+
+It downloads the Kotlin 2.1 and 2.2 compilers and compiles a small consumer of the JVM artifact in a subprocess,
+so no old compiler loads into the Gradle daemon. Kotlin 2.2 must compile it, and Kotlin 2.1 must reject it on the
+metadata version. The two compiler downloads are the reason it is deliberately **not** part of `check`; run it when
+the Kotlin floor or the toolchain moves. `verifyConsumerFloor`, the offline half of the same claim, is part of
+`check`.
+
 ## Documentation
 
 Learn what TypeSafe can do in the [TypeSafe docs](https://docs.typesafe.ai/). This SDK's own API reference is
@@ -225,6 +246,14 @@ signature change that leaves them stale fails the build.
 See [`CONTEXT.md`](CONTEXT.md) for the vocabulary this project uses for the API and the decisions behind it.
 
 ## Compatibility
+
+### Kotlin consumer floor
+
+A consumer needs **Kotlin 2.3 or newer**. The dependency chain sets that floor, not this module: Ktor 3.5.2 and
+`kotlinx-serialization` 1.11.0 ship KLIB ABI 2.3.0 and JVM metadata 2.3.0, and KLIB ABI compatibility is
+one-directional. A JVM-only consumer can use Kotlin 2.2, because a consumer compiler reads JVM metadata one
+language version ahead of it. `verifyConsumerFloor` runs in `check`: it reads the built commonMain klib manifest
+and the compiled JVM class, and fails if a compiler or language-version move changes either floor.
 
 The public API dump under `api/` is committed and compared on every build. Until `0.1.0` is tagged it is a review
 gate rather than a promise: any public-surface change must show up as a deliberate, reviewed diff rather than a

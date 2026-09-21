@@ -60,6 +60,9 @@ public interface TypeSafeClient : AutoCloseable {
      * @param model the model to use, or `null` for the client's configured default.
      * @param timeout the per-attempt request timeout, or `null` for the client's configured default.
      * @param retry the retry policy for this call, or `null` for the client's configured default.
+     * @param headers extra headers for this call, or `null` for none. They merge over [defaultHeaders] and
+     *   under the SDK's own headers, which always win, so a caller cannot replace `Authorization`, `Accept`,
+     *   `Content-Type` or the identity headers.
      * @throws com.sierranevadalabs.jev.sdk.errors.JevError for a failed call; the concrete class matches the
      *   siblings' names.
      */
@@ -69,6 +72,7 @@ public interface TypeSafeClient : AutoCloseable {
         model: String? = null,
         timeout: Duration? = null,
         retry: RetryPolicy? = null,
+        headers: Map<String, String>? = null,
     ): SystemOneResponse
 }
 
@@ -77,6 +81,7 @@ public interface TypeSafeClient : AutoCloseable {
  *
  * @param state the content to evaluate.
  * @param questions the questions; at least one.
+ * @param headers extra headers for this call; exactly as on [TypeSafeClient.systemOne].
  */
 public suspend fun TypeSafeClient.systemOne(
     state: String,
@@ -84,7 +89,16 @@ public suspend fun TypeSafeClient.systemOne(
     model: String? = null,
     timeout: Duration? = null,
     retry: RetryPolicy? = null,
-): SystemOneResponse = systemOne(JsonPrimitive(state), *questions, model = model, timeout = timeout, retry = retry)
+    headers: Map<String, String>? = null,
+): SystemOneResponse =
+    systemOne(
+        JsonPrimitive(state),
+        *questions,
+        model = model,
+        timeout = timeout,
+        retry = retry,
+        headers = headers,
+    )
 
 /**
  * Builds a client from [config], resolving anything left `null` against the environment (`TYPESAFE_API_KEY`,
@@ -140,8 +154,8 @@ internal class TypeSafeClientImpl(
 
     // The resource gets a closure, not the transport, so it never has the API key in reach.
     override val models: Models =
-        ModelsApi { timeout, retry ->
-            request(HttpMethod.Get, "/v1/models", timeout = timeout, retry = retry)
+        ModelsApi { timeout, retry, headers ->
+            request(HttpMethod.Get, "/v1/models", timeout = timeout, retry = retry, headers = headers)
         }
 
     override suspend fun systemOne(
@@ -150,6 +164,7 @@ internal class TypeSafeClientImpl(
         model: String?,
         timeout: Duration?,
         retry: RetryPolicy?,
+        headers: Map<String, String>?,
     ): SystemOneResponse {
         validateQuestions(questions.toList())
         val body =
@@ -158,7 +173,9 @@ internal class TypeSafeClientImpl(
                 put("model", model ?: defaultModel)
                 put("questions", JsonObject(questions.associate { it.id to it.toWireJson() }))
             }.toString()
-        return decodeSystemOneResponse(request(HttpMethod.Post, SYSTEM_ONE_PATH, body, timeout, retry))
+        return decodeSystemOneResponse(
+            request(HttpMethod.Post, SYSTEM_ONE_PATH, body, headers = headers, timeout = timeout, retry = retry),
+        )
     }
 
     override fun close() {
@@ -171,10 +188,18 @@ internal class TypeSafeClientImpl(
         body: String? = null,
         timeout: Duration? = null,
         retry: RetryPolicy? = null,
+        headers: Map<String, String>? = null,
     ): TransportResponse {
         val response =
             try {
-                transport.request(method, path, body = body, timeout = timeout, policy = retry)
+                transport.request(
+                    method,
+                    path,
+                    body = body,
+                    headers = headers.orEmpty(),
+                    timeout = timeout,
+                    policy = retry,
+                )
             } catch (failure: TransportException) {
                 throw failure.asPublicError()
             }
@@ -212,10 +237,10 @@ internal fun decodeSystemOneResponse(response: TransportResponse): SystemOneResp
 private fun invalidResponse(
     response: TransportResponse,
     message: String,
-    field: String?,
+    fieldPath: String?,
 ): APIResponseValidationError =
     APIResponseValidationError(
-        field = field,
+        fieldPath = fieldPath,
         status = response.status,
         body = parseBody(response.body),
         requestId = response.requestId,
