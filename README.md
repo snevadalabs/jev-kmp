@@ -1,6 +1,6 @@
 # jev-kmp
 
-[![status: unreleased](https://img.shields.io/badge/status-unreleased-lightgrey.svg)](CHANGELOG.md)
+[![status: released](https://img.shields.io/badge/status-released-brightgreen.svg)](https://central.sonatype.com/artifact/com.sierranevadalabs/jev-kmp)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Kotlin Multiplatform SDK for the TypeSafe / Jev System One API — **typed questions with calibrated
@@ -11,8 +11,8 @@ Jev answers typed questions about a state: whether something is true (`noul`), w
 generated text. Learn what TypeSafe can do in the [TypeSafe docs](https://docs.typesafe.ai/). Every Kotlin
 example in this file is compiled by the test suite, so it cannot drift from the API.
 
-> **Status: unreleased.** `0.1.0` is under construction. The public API is not yet stable and no artifact has
-> been published, so the coordinates below are what `0.1.0` will publish, not something to depend on today.
+> **Status: released.** `0.1.0` is on Maven Central. The API is pre-1.0, so a minor release may still change it;
+> pin the version you depend on.
 
 | | |
 |---|---|
@@ -255,9 +255,9 @@ one-directional. A JVM-only consumer can use Kotlin 2.2, because a consumer comp
 language version ahead of it. `verifyConsumerFloor` runs in `check`: it reads the built commonMain klib manifest
 and the compiled JVM class, and fails if a compiler or language-version move changes either floor.
 
-The public API dump under `api/` is committed and compared on every build. Until `0.1.0` is tagged it is a review
-gate rather than a promise: any public-surface change must show up as a deliberate, reviewed diff rather than a
-silent `apiDump`. From the first tag onward it is the published baseline.
+The public API dump under `api/` is committed and compared on every build. From `0.1.0` onward it is the
+published baseline: any public-surface change must show up as a deliberate, reviewed diff rather than a silent
+`apiDump`.
 
 ## Contributing
 

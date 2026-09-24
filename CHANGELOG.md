@@ -9,9 +9,7 @@ The version declared in `gradle.properties` must match the top heading below: a 
 `Unreleased` heading, and a release version requires the heading to name it. The `check-version` Gradle task
 enforces this, and the publish workflow runs it before anything is uploaded.
 
-## [Unreleased]
-
-Initial release, not yet tagged: no artifact has been published to Maven Central.
+## [0.1.0] - 2026-09-24
 
 - The SDK is usable end to end: `TypeSafeClient`, its environment-aware configuration, `client.models.list()`,
   and the twelve-class error tree under `com.sierranevadalabs.jev.sdk.errors`.
