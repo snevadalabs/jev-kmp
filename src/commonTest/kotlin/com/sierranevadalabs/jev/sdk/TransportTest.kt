@@ -532,11 +532,17 @@ class TransportTest {
             assertEquals(200, transport.request(HttpMethod.Get, "/v1/models").status)
 
             transport.close()
-            runCatching { transport.request(HttpMethod.Get, "/v1/models") }
+            val refusal =
+                assertIs<IllegalStateException>(
+                    runCatching { transport.request(HttpMethod.Get, "/v1/models") }.exceptionOrNull(),
+                )
+            assertTrue(
+                refusal.message?.contains("transport is closed") == true,
+                "the transport must refuse the call itself, not leave it to Ktor: $refusal",
+            )
 
-            // The leak that closing the Ktor client prevents (threads, connection pool) has no local
-            // observable, so the guard is behavioural: a closed transport must not reach the engine. Delete
-            // `http.close()` from `Transport.close` and this count becomes 2.
+            // A closed transport must not reach the engine. This count was 2 on the CI runners while the guard
+            // was Ktor's alone, which let the request through.
             assertEquals(1, attempts)
         }
 

@@ -42,6 +42,13 @@ internal class Transport(
     private val timeSource: TimeSource,
 ) : AutoCloseable {
     /**
+     * Set before the client and the engine are closed, so a call that races [close] never sends. Ktor's own
+     * guard is not enough: a request after close reached the engine on the CI runners, which is the one thing a
+     * closed transport promises not to do.
+     */
+    private var closed = false
+
+    /**
      * Sends one request. [body] must be a `String`, because Ktor copies the body object by reference on each
      * retry: a streamed body would be consumed by the first attempt and fail the second.
      *
@@ -55,6 +62,7 @@ internal class Transport(
         timeout: Duration? = null,
         policy: RetryPolicy? = null,
     ): TransportResponse {
+        check(!closed) { "this transport is closed" }
         val effectivePolicy = policy ?: retryPolicy
         val started = timeSource.markNow()
         try {
@@ -83,6 +91,7 @@ internal class Transport(
     }
 
     override fun close() {
+        closed = true
         http.close()
         if (ownsEngine) engine.close()
     }
