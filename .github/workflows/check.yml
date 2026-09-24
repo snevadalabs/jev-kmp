@@ -30,6 +30,14 @@ jobs:
           packages: "platforms;android-36"
       - uses: gradle/actions/setup-gradle@v6
       - run: ./gradlew ktlintCheck checkVersion checkJvmBytecode koverVerify jvmTest linuxX64Test
+      # A red lane must leave the report behind. The console line for a failed assertion carries the frame, and
+      # not always the message.
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: test-reports-linux
+          path: build/reports/tests
+          if-no-files-found: ignore
 
   # The Apple lane, and the only host that can build every declared target — so the API dump comparison and
   # Dokka live here. iosSimulatorArm64Test is the Apple test that actually executes on an arm64 runner;
@@ -53,4 +61,10 @@ jobs:
         with:
           name: dokka-html
           path: build/dokka/html
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: test-reports-apple
+          path: build/reports/tests
           if-no-files-found: ignore
