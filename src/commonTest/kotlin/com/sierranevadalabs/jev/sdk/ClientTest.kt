@@ -69,7 +69,7 @@ class ClientTest {
             assertEquals("application/json", request.headers[ACCEPT_HEADER])
             // Ktor moves the content type onto the outgoing body; the engine writes it as the header on the wire.
             assertEquals(ContentType.Application.Json, request.body.contentType)
-            assertEquals("typesafe-sdk-kotlin/0.1.0", request.headers[SDK_HEADER])
+            assertEquals("typesafe-sdk-kotlin/$SDK_VERSION", request.headers[SDK_HEADER])
             assertTrue(request.headers[RUNTIME_HEADER]?.contains('/') == true, "the runtime header names a platform and version")
             assertNull(request.headers[RETRY_COUNT_HEADER], "attempt 0 never carries a retry count")
 
@@ -689,7 +689,7 @@ class ClientTest {
             assertEquals("Bearer test-key", systemOneRequest.headers[AUTHORIZATION_HEADER], "the SDK's key still wins")
             val listRequest = engine.requestHistory[1]
             assertEquals("models", listRequest.headers["X-Call"], "a per-call header reaches the catalogue")
-            assertEquals("typesafe-sdk-kotlin/0.1.0", listRequest.headers[SDK_HEADER], "the SDK header still wins")
+            assertEquals("typesafe-sdk-kotlin/$SDK_VERSION", listRequest.headers[SDK_HEADER], "the SDK header still wins")
         }
 }
 

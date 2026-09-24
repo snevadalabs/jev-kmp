@@ -371,8 +371,7 @@ val checkSigningKey by tasks.registering {
                             it.extension == "asc" &&
                                 forThisVersion.containsMatchIn(it.name) &&
                                 !it.name.contains("-SNAPSHOT")
-                        }
-                        .toList()
+                        }.toList()
                 }.sorted()
         check(signatures.isNotEmpty()) {
             "no signatures for $declaredVersion under build/signatures — sign a publication first"
@@ -403,9 +402,10 @@ val checkSigningKey by tasks.registering {
 }
 
 // A publish is the only moment a wrong key can be caught for free, so every publish task depends on the check.
-tasks.matching {
-    it.name.startsWith("publish") && (it.name.contains("MavenCentral") || it.name.contains("MavenLocal"))
-}.configureEach { dependsOn(checkSigningKey) }
+tasks
+    .matching {
+        it.name.startsWith("publish") && (it.name.contains("MavenCentral") || it.name.contains("MavenLocal"))
+    }.configureEach { dependsOn(checkSigningKey) }
 
 // Java 8 bytecode is the level the pinned toolchain promises consumers, and `jvmTarget` alone does not prove it.
 // The class file's major version does: 52 is Java 8.

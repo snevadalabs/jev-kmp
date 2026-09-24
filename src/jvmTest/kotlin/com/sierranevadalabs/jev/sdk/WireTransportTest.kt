@@ -59,7 +59,7 @@ class WireTransportTest {
                 assertEquals("Bearer test-key", request.header("Authorization"))
                 assertEquals("application/json", request.header("Accept"))
                 assertEquals("application/json", request.header("Content-Type"))
-                assertEquals("typesafe-sdk-kotlin/0.1.0", request.header("X-TypeSafe-SDK"))
+                assertEquals("typesafe-sdk-kotlin/$SDK_VERSION", request.header("X-TypeSafe-SDK"))
                 assertEquals("jvm/${System.getProperty("java.version")}", request.header("X-TypeSafe-Runtime"))
                 assertEquals("127.0.0.1:${server.port}", request.header("Host"))
                 assertNull(request.header("X-TypeSafe-Retry-Count"), "attempt 0 carries no retry count")

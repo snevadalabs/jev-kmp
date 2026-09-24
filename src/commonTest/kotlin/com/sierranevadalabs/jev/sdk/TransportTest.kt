@@ -379,7 +379,7 @@ class TransportTest {
             assertEquals("application/json", request.headers["Accept"])
             assertEquals(1, request.headers.getAll("Accept")?.size, "names must be merged case-insensitively")
             assertNull(request.headers[RETRY_COUNT_HEADER], "a caller-supplied retry count is stripped, not honoured")
-            assertEquals("typesafe-sdk-kotlin/0.1.0", request.headers[SDK_HEADER])
+            assertEquals("typesafe-sdk-kotlin/$SDK_VERSION", request.headers[SDK_HEADER])
             assertTrue(request.headers[RUNTIME_HEADER]?.contains('/') == true)
             assertEquals("""{"state":"x"}""", request.body.toByteArray().decodeToString())
             transport.close()
@@ -410,7 +410,7 @@ class TransportTest {
 
             val request = engine.requestHistory.single()
             assertEquals("Bearer test-key", request.headers[AUTHORIZATION_HEADER])
-            assertEquals("typesafe-sdk-kotlin/0.1.0", request.headers[SDK_HEADER])
+            assertEquals("typesafe-sdk-kotlin/$SDK_VERSION", request.headers[SDK_HEADER])
             assertTrue(request.headers[RUNTIME_HEADER]?.contains('/') == true, request.headers[RUNTIME_HEADER])
             assertNull(request.headers[RETRY_COUNT_HEADER], "a caller-supplied retry count is removed, whatever case it used")
             for (name in listOf(AUTHORIZATION_HEADER, SDK_HEADER, RUNTIME_HEADER)) {
