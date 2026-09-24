@@ -42,14 +42,27 @@ jobs:
           path: build/reports/pitest
           if-no-files-found: ignore
 
+      # A version is published once. Re-running for a version Central already has fails the deployment as a
+      # duplicate, which is noise for a version a maintainer already shipped from their own machine.
+      - name: Look for this version on Maven Central
+        id: central
+        run: |
+          version=$(sed -nE 's/^version=(.*)$/\1/p' gradle.properties)
+          if curl -sfI "https://repo1.maven.org/maven2/com/sierranevadalabs/jev-kmp/$version/" > /dev/null; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::jev-kmp $version is already on Maven Central; nothing uploaded."
+          fi
+
       # Releases the deployment as well as uploading it. A tag push is the human gate, so a permanent version
       # number is spent the moment this runs; `publishToMavenCentral` alone would leave the deployment as a
-      # draft that nobody remembers to release. Never re-run this for a version Central already has.
+      # draft that nobody remembers to release. `checkSigningKey` comes along as a dependency of every publish
+      # task, and refuses to upload unless every signature names the project key.
       #
       # No ORG_GRADLE_PROJECT_signingInMemoryKeyId: KGP's checkSigningConfiguration uses that value for its
       # keyserver lookup, and Hockeypuck does not resolve a 32-bit short id. Gradle signs correctly without
       # it, and the signature carries the full key id that Maven Central validates against.
       - run: ./gradlew publishAndReleaseToMavenCentral
+        if: steps.central.outputs.already != 'true'
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
