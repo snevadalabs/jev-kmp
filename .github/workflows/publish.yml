@@ -42,13 +42,14 @@ jobs:
           path: build/reports/pitest
           if-no-files-found: ignore
 
-      # Signing and the namespace verification are one-time human prerequisites; this workflow is the shape,
-      # and it is expected to fail until those exist.
+      # Releases the deployment as well as uploading it. A tag push is the human gate, so a permanent version
+      # number is spent the moment this runs; `publishToMavenCentral` alone would leave the deployment as a
+      # draft that nobody remembers to release. Never re-run this for a version Central already has.
       #
       # No ORG_GRADLE_PROJECT_signingInMemoryKeyId: KGP's checkSigningConfiguration uses that value for its
       # keyserver lookup, and Hockeypuck does not resolve a 32-bit short id. Gradle signs correctly without
       # it, and the signature carries the full key id that Maven Central validates against.
-      - run: ./gradlew publishToMavenCentral
+      - run: ./gradlew publishAndReleaseToMavenCentral
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}

@@ -1,14 +1,12 @@
 name: check
 
-# Disabled while the org's GitHub Actions billing is blocked (private repo on a free plan, macOS minutes
-# exhausted) — jobs fail in 9s without starting. Nothing runs until billing is restored; the gate is
-# `./gradlew check` locally in the meantime. To restore, put back the two original triggers:
-#   on:
-#     push:
-#       branches: [main]
-#     pull_request:
+# Runs on every push to main and every pull request. It was reduced to `workflow_dispatch` while the org's
+# GitHub Actions billing was blocked; the repository is public now, so standard runners are free and the
+# automatic triggers are back. No secrets reach this workflow, so a pull request from a fork is safe.
 on:
-  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
 
 concurrency:
   group: check-${{ github.ref }}

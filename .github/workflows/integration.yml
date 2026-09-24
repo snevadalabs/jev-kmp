@@ -5,8 +5,8 @@ name: integration
 # grant a fork author the base repo's token and secrets — is not used anywhere in this repo. `schedule` and
 # `push` to `main` only ever run code from the default branch, so the key cannot be exfiltrated by a fork PR.
 #
-# Actions is currently billing-blocked on this private repo, so this workflow does not run yet. The wiring is
-# the deliverable; the gate is `TYPESAFE_API_KEY=… ./gradlew jvmTest -Ptypesafe.live=true` run locally.
+# This needs the JEV_API_KEY secret. Without it the live tier runs with no key and fails, so the nightly run is
+# red on purpose until the secret is set.
 on:
   schedule:
     # Nightly, 06:00 UTC.
@@ -38,6 +38,7 @@ jobs:
 
       # Both gates are required: the Gradle property opts the suite in, and the SDK reads the key from
       # TYPESAFE_API_KEY. The repository secret is named JEV_API_KEY, so it is mapped here.
+      # This job fails, and is meant to, when JEV_API_KEY is unset.
       - run: ./gradlew jvmTest -Ptypesafe.live=true
         env:
           TYPESAFE_API_KEY: ${{ secrets.JEV_API_KEY }}
