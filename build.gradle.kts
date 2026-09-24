@@ -338,6 +338,75 @@ val checkVersion by tasks.registering {
     }
 }
 
+// The signing key arrives from the environment and never from the repository, so the wrong key still produces
+// valid, verifiable signatures — under someone else's name. That is how 0.1.0 shipped, and every other check
+// passed. This reads the issuer out of every signature for the version being released, and refuses to publish
+// unless each one names the key this project publishes under.
+val expectedSigningKeyId = "594129A6F5E2E4E5"
+
+val checkSigningKey by tasks.registering {
+    group = "verification"
+    description = "Asserts every produced signature names the project's Maven Central key."
+
+    val declaredVersion = version.toString()
+    // Signatures for the artifacts, plus the staged layout the Central plugin zips and uploads — which is
+    // where the `.pom` and `.module` signatures live, and what a consumer's build actually reads.
+    val signatureRoots =
+        listOf(layout.buildDirectory.dir("signatures"), layout.buildDirectory.dir("publishing/mavenCentral"))
+    val base = layout.projectDirectory.asFile
+    dependsOn(tasks.matching { it.name.startsWith("sign") && it.name.endsWith("Publication") })
+    inputs.files(signatureRoots)
+
+    doLast {
+        // Each root keeps every version ever built here, so compare against this one only.
+        val forThisVersion = Regex("-" + Regex.escape(declaredVersion) + "[.-]")
+        val signatures =
+            signatureRoots
+                .flatMap { root ->
+                    root
+                        .get()
+                        .asFile
+                        .walkTopDown()
+                        .filter {
+                            it.extension == "asc" &&
+                                forThisVersion.containsMatchIn(it.name) &&
+                                !it.name.contains("-SNAPSHOT")
+                        }
+                        .toList()
+                }.sorted()
+        check(signatures.isNotEmpty()) {
+            "no signatures for $declaredVersion under build/signatures — sign a publication first"
+        }
+
+        val wrong =
+            signatures.filterNot { file ->
+                val packets =
+                    try {
+                        ProcessBuilder("gpg", "--list-packets", file.absolutePath)
+                            .redirectErrorStream(true)
+                            .start()
+                            .inputStream
+                            .bufferedReader()
+                            .readText()
+                    } catch (cause: java.io.IOException) {
+                        throw GradleException("gpg is required to read the signing key id: ${cause.message}", cause)
+                    }
+                packets.contains("issuer key ID $expectedSigningKeyId")
+            }
+
+        check(wrong.isEmpty()) {
+            "these signatures do not name the project key $expectedSigningKeyId:\n" +
+                wrong.joinToString("\n") { "  ${it.relativeTo(base)}" }
+        }
+        logger.lifecycle("checkSigningKey: ${signatures.size} signature(s) name $expectedSigningKeyId")
+    }
+}
+
+// A publish is the only moment a wrong key can be caught for free, so every publish task depends on the check.
+tasks.matching {
+    it.name.startsWith("publish") && (it.name.contains("MavenCentral") || it.name.contains("MavenLocal"))
+}.configureEach { dependsOn(checkSigningKey) }
+
 // Java 8 bytecode is the level the pinned toolchain promises consumers, and `jvmTarget` alone does not prove it.
 // The class file's major version does: 52 is Java 8.
 val checkJvmBytecode by tasks.registering {
