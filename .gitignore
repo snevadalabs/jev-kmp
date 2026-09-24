@@ -16,3 +16,6 @@ local.properties
 # Xcode
 xcuserdata/
 *.xcuserstate
+
+# Local secrets (PGP passphrase)
+.env
