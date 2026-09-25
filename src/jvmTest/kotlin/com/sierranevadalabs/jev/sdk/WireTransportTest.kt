@@ -2,6 +2,7 @@ package com.sierranevadalabs.jev.sdk
 
 import com.sierranevadalabs.jev.sdk.errors.APIConnectionError
 import com.sierranevadalabs.jev.sdk.errors.APITimeoutError
+import com.sierranevadalabs.jev.sdk.errors.JevError
 import io.ktor.client.engine.cio.CIO
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -112,7 +113,11 @@ class WireTransportTest {
                 client.close()
 
                 val connection = assertIs<APIConnectionError>(failure)
-                assertIs<IOException>(connection.cause, "the engine's own failure survives as the cause")
+                // The engine's own failure survives as the cause. Its class belongs to the engine: a dropped
+                // connection arrives as an IOException, and a channel already closed arrives as an
+                // IllegalStateException. So assert that the error was preserved, not that it has one class.
+                val cause = connection.cause
+                assertTrue(cause != null && cause !is JevError, "the engine's failure must survive as the cause: $cause")
                 assertEquals(3, server.recordedRequests.size, "the first attempt plus one per retry")
             }
         }
