@@ -584,9 +584,14 @@ class ClientTest {
     @Test
     fun aMissingApiKeyFailsWithTheRootError() =
         runTest {
+            // The environment is injected empty, so this fails because no key exists anywhere rather than
+            // because the shell happens not to export TYPESAFE_API_KEY.
             val failure =
                 runCatching {
-                    TypeSafeClient(TypeSafeConfig(engine = MockEngine { respond("""{"model":"x","answers":{}}""") }))
+                    createClient(
+                        TypeSafeConfig(engine = MockEngine { respond("""{"model":"x","answers":{}}""") }),
+                        env = { null },
+                    )
                 }.exceptionOrNull()
 
             val root = assertIs<JevError>(failure)
@@ -705,10 +710,13 @@ private class RecordingEngine(
     }
 }
 
+// `env = { null }` keeps every test here independent of the shell: an exported TYPESAFE_BASE_URL or
+// TYPESAFE_DEFAULT_MODEL would otherwise override the defaults these tests assert. The live tier reads the real
+// environment through the public constructor instead.
 private fun client(
     engine: HttpClientEngine,
     retry: RetryPolicy = RetryPolicy(maxRetries = 0),
-): TypeSafeClient = TypeSafeClient(TypeSafeConfig(apiKey = "test-key", engine = engine, retry = retry))
+): TypeSafeClient = createClient(TypeSafeConfig(apiKey = "test-key", engine = engine, retry = retry), env = { null })
 
 private fun fixtureHeaders(vararg extra: Pair<String, String>): Headers =
     HeadersBuilder()

@@ -359,12 +359,14 @@ private fun readRequest(input: InputStream): RecordedRequest {
 private const val CR = 13
 private const val LF = 10
 
+// `env = { null }` keeps every test here independent of the shell, so an exported TYPESAFE_* variable cannot
+// change the wire bytes these tests assert.
 private fun client(
     port: Int,
     timeout: Duration = 10.seconds,
     retry: RetryPolicy = RetryPolicy(),
 ): TypeSafeClient =
-    TypeSafeClient(
+    createClient(
         TypeSafeConfig(
             apiKey = "test-key",
             baseUrl = "http://127.0.0.1:$port",
@@ -372,4 +374,5 @@ private fun client(
             retry = retry,
             engine = CIO.create(),
         ),
+        env = { null },
     )
