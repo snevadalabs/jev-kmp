@@ -9,6 +9,12 @@ The version declared in `gradle.properties` must match the top heading below: a 
 `Unreleased` heading, and a release version requires the heading to name it. The `check-version` Gradle task
 enforces this, and the publish workflow runs it before anything is uploaded.
 
+## [0.1.2] - 2026-09-25
+
+- `Transport` refuses a request after `close()` instead of leaving the guard to the Ktor client. A request that
+  followed `close()` still reached the engine on some machines, so a closed transport could send. It now holds
+  its own flag and fails the call before any bytes leave.
+
 ## [0.1.1] - 2026-09-24
 
 - Signed with the project's own Maven Central key, `594129A6F5E2E4E5`. `0.1.0` was signed by an unrelated

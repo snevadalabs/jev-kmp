@@ -11,7 +11,7 @@ Jev answers typed questions about a state: whether something is true (`noul`), w
 generated text. Learn what TypeSafe can do in the [TypeSafe docs](https://docs.typesafe.ai/). Every Kotlin
 example in this file is compiled by the test suite, so it cannot drift from the API.
 
-> **Status: released.** `0.1.1` is on Maven Central. The API is pre-1.0, so a minor release may still change it;
+> **Status: released.** `0.1.2` is on Maven Central. The API is pre-1.0, so a minor release may still change it;
 > pin the version you depend on.
 
 | | |
@@ -48,7 +48,7 @@ Install the SDK (Gradle Kotlin DSL):
 
 ```kts
 dependencies {
-    implementation("com.sierranevadalabs:jev-kmp:0.1.1")
+    implementation("com.sierranevadalabs:jev-kmp:0.1.2")
 }
 ```
 
